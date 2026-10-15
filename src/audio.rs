@@ -18,6 +18,11 @@ pub fn stop_current() {
     }
 }
 
+/// Apakah ada audio yang sedang diputar.
+pub fn is_playing() -> bool {
+    CURRENT_PLAYER.lock().unwrap().is_some()
+}
+
 /// Cari file adzan: pakai file dari settings jika ada; kalau tidak, cari
 /// `assets/adzan.mp3` di dekat exe / dir config / cwd.
 pub fn resolve_adzan(settings: &crate::settings::Settings) -> Option<PathBuf> {

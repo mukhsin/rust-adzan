@@ -1,3 +1,4 @@
+use super::icons;
 use crate::autostart;
 use crate::cities::{CITIES, find_city};
 use crate::settings::{CalcMethod, MadhabChoice, Settings};
@@ -14,12 +15,24 @@ const ZONA_WAKTU: [(&str, &str); 3] = [
 const SELECT: &str = "flex-1 max-w-[210px] bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg px-2 py-1.5 text-sm text-zinc-900 dark:text-zinc-100 outline-none focus:ring-2 ring-zinc-500/50 transition-colors";
 const INPUT: &str = "w-24 bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg px-2 py-1.5 text-sm text-zinc-900 dark:text-zinc-100 text-right outline-none focus:ring-2 ring-zinc-500/50 transition-colors";
 const BTN_GHOST: &str = "px-3 py-1.5 rounded-lg text-xs font-medium border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors";
+const BTN_ICON: &str = "p-1.5 rounded-lg border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors";
 
 #[component]
 pub fn SettingsView() -> Element {
     // Draft lokal; setiap perubahan langsung disimpan + disebarkan.
     let mut draft = use_signal(|| (*state::settings()).clone());
     let mut status = use_signal(String::new);
+    // Status pemutaran audio (di-refresh berkala agar ikon play/stop akurat).
+    let mut playing = use_signal(crate::audio::is_playing);
+    use_future(move || async move {
+        loop {
+            tokio::time::sleep(std::time::Duration::from_millis(250)).await;
+            let now = crate::audio::is_playing();
+            if *playing.read() != now {
+                playing.set(now);
+            }
+        }
+    });
 
     let mut apply = move |s: Settings| {
         crate::settings::save(&s);
@@ -182,24 +195,29 @@ pub fn SettingsView() -> Element {
                             "Pilih…"
                         }
                         button {
-                            class: "{BTN_GHOST}",
+                            class: "{BTN_ICON}",
+                            title: if *playing.read() {
+                                "Hentikan pemutaran"
+                            } else {
+                                "Tes putar adzan"
+                            },
                             onclick: move |_| {
-                                let s = state::settings();
-                                match crate::audio::play_adzan(&s, false) {
-                                    Ok(_) => status.set("▶ memutar adzan…".into()),
-                                    Err(e) => status.set(format!("✕ {e}")),
+                                if *playing.read() {
+                                    crate::audio::stop_current();
+                                    status.set("⏹ pemutaran dihentikan".into());
+                                } else {
+                                    let s = state::settings();
+                                    match crate::audio::play_adzan(&s, false) {
+                                        Ok(_) => status.set("▶ memutar adzan…".into()),
+                                        Err(e) => status.set(format!("✕ {e}")),
+                                    }
                                 }
                             },
-                            "Tes"
-                        }
-                        button {
-                            class: "{BTN_GHOST}",
-                            title: "Hentikan pemutaran tes/adzan",
-                            onclick: move |_| {
-                                crate::audio::stop_current();
-                                status.set("⏹ pemutaran dihentikan".into());
-                            },
-                            "Stop"
+                            if *playing.read() {
+                                icons::IconSquare { class: "w-3.5 h-3.5" }
+                            } else {
+                                icons::IconPlay { class: "w-3.5 h-3.5" }
+                            }
                         }
                     }
                 }
@@ -217,15 +235,29 @@ pub fn SettingsView() -> Element {
                             "Pilih…"
                         }
                         button {
-                            class: "{BTN_GHOST}",
+                            class: "{BTN_ICON}",
+                            title: if *playing.read() {
+                                "Hentikan pemutaran"
+                            } else {
+                                "Tes putar adzan Subuh"
+                            },
                             onclick: move |_| {
-                                let s = state::settings();
-                                match crate::audio::play_adzan(&s, true) {
-                                    Ok(_) => status.set("▶ memutar adzan subuh…".into()),
-                                    Err(e) => status.set(format!("✕ {e}")),
+                                if *playing.read() {
+                                    crate::audio::stop_current();
+                                    status.set("⏹ pemutaran dihentikan".into());
+                                } else {
+                                    let s = state::settings();
+                                    match crate::audio::play_adzan(&s, true) {
+                                        Ok(_) => status.set("▶ memutar adzan subuh…".into()),
+                                        Err(e) => status.set(format!("✕ {e}")),
+                                    }
                                 }
                             },
-                            "Tes"
+                            if *playing.read() {
+                                icons::IconSquare { class: "w-3.5 h-3.5" }
+                            } else {
+                                icons::IconPlay { class: "w-3.5 h-3.5" }
+                            }
                         }
                     }
                 }
@@ -244,18 +276,30 @@ pub fn SettingsView() -> Element {
                     }
                 }
                 Field { label: "Pengingat sebelum adzan", hint: "Menit sebelum waktu masuk (0 = nonaktif)",
-                    input {
-                        class: "{INPUT}",
-                        r#type: "number",
-                        min: "0", max: "60",
-                        value: "{draft.read().pre_notif_minutes}",
-                        onchange: move |e| {
-                            if let Ok(v) = e.value().parse::<u32>() {
+                    div { class: "flex items-center gap-1",
+                        button {
+                            class: "{BTN_ICON}",
+                            title: "Kurangi",
+                            onclick: move |_| {
                                 let mut s = draft.read().clone();
-                                s.pre_notif_minutes = v.clamp(0, 60);
+                                s.pre_notif_minutes = s.pre_notif_minutes.saturating_sub(1);
                                 apply(s);
-                            }
-                        },
+                            },
+                            icons::IconMinus { class: "w-3.5 h-3.5" }
+                        }
+                        span { class: "w-12 text-center text-sm tabular-nums text-zinc-700 dark:text-zinc-300",
+                            "{draft.read().pre_notif_minutes} menit"
+                        }
+                        button {
+                            class: "{BTN_ICON}",
+                            title: "Tambah",
+                            onclick: move |_| {
+                                let mut s = draft.read().clone();
+                                s.pre_notif_minutes = (s.pre_notif_minutes + 1).min(60);
+                                apply(s);
+                            },
+                            icons::IconPlus { class: "w-3.5 h-3.5" }
+                        }
                     }
                 }
             }
