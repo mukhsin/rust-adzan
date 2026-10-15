@@ -168,7 +168,7 @@ pub fn SettingsView() -> Element {
                         },
                     }
                 }
-                Field { label: "File adzan", hint: "Kosong = assets/adzan.mp3 di folder aplikasi",
+                Field { label: "File adzan", hint: "Kosong = adzan bawaan aplikasi",
                     div { class: "flex items-center gap-1.5",
                         button {
                             class: "{BTN_GHOST}",
@@ -203,7 +203,7 @@ pub fn SettingsView() -> Element {
                         }
                     }
                 }
-                Field { label: "File khusus Subuh", hint: "Opsional; kosong = pakai file adzan umum",
+                Field { label: "File khusus Subuh", hint: "Opsional; kosong = adzan Subuh bawaan",
                     div { class: "flex items-center gap-1.5",
                         button {
                             class: "{BTN_GHOST}",

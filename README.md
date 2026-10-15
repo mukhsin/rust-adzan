@@ -13,8 +13,10 @@ lokal, tidak butuh internet).
   Umm al-Qura, ISNA.
 - **Lokasi** — pilih dari 47 kota Indonesia (beserta zona waktu
   WIB/WITA/WIT) atau input koordinat manual.
-- **Audio adzan** — putar MP3 saat masuk waktu; file khusus Subuh
-  opsional; fallback bunyi beep jika file belum diatur.
+- **Audio adzan** — putar MP3 saat masuk waktu; adzan bawaan (umum +
+  khusus Subuh) sudah ter-embed di aplikasi, dan bisa diganti dengan
+  file sendiri lewat Pengaturan. Pemutaran bisa dihentikan kapan saja
+  lewat tombol Stop.
 - **Countdown** — hitung mundur real-time ke sholat berikutnya
   (setelah Isya mengarah ke Subuh esok hari).
 - **System tray** — klik kiri ikon tray men-toggle widget; klik kanan membuka
@@ -66,10 +68,12 @@ just bundle   # installer MSI
 
 ### Audio adzan
 
-Letakkan file `assets/adzan.mp3` (dan opsional `assets/adzan_subuh.mp3`),
-atau pilih file audio apa pun (MP3/WAV/OGG/FLAC/M4A/AAC) lewat menu
-**Pengaturan** di aplikasi. Tanpa file, aplikasi tetap memberi tanda
-dengan bunyi beep.
+Adzan bawaan (`assets/adzan.mp3` + `assets/adzan-subuh.mp3`) sudah
+**ter-embed di binary** — aplikasi langsung siap pakai. Untuk memakai
+file sendiri: pilih audio apa pun (MP3/WAV/OGG/FLAC/M4A/AAC) lewat menu
+**Pengaturan** di aplikasi, tanpa perlu build ulang. Urutan prioritas:
+file kustom → file di folder assets → adzan bawaan. Pemutaran tes bisa
+dihentikan lewat tombol Stop.
 
 ### Ikon aplikasi (taskbar & tray)
 

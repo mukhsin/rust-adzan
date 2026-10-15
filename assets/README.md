@@ -1,14 +1,24 @@
 # Assets
 
-Letakkan file audio adzan di folder ini:
+## Audio adzan
 
-- `adzan.mp3` — adzan umum (diputar saat masuk waktu Dzuhur, Ashar, Maghrib, Isya)
-- `adzan_subuh.mp3` — (opsional) adzan khusus Subuh
+- `adzan.mp3` — adzan bawaan (Dzuhur, Ashar, Maghrib, Isya)
+- `adzan-subuh.mp3` — adzan bawaan khusus Subuh
 
-Prioritas pencarian file: file yang dipilih lewat menu Pengaturan →
-folder ini → folder exe → folder config.
+Kedua file ini **di-embed ke binary** (`include_bytes!` di `src/audio.rs`)
+sehingga selalu tersedia walau exe dipindah. Setelah mengganti file,
+build ulang aplikasi.
 
-Jika tidak ada file sama sekali, aplikasi memainkan bunyi "beep"
-sebagai penanda masuk waktu sholat.
+User tetap bisa memakai file sendiri lewat **Pengaturan → Audio Adzan**
+(Pilih…) tanpa perlu build ulang — file kustom diprioritaskan di atas
+bawaan.
 
-File audio bebas dipilih (MP3/WAV/OGG/FLAC/M4A/AAC).
+## Ikon
+
+- `mosque.png` / `mosque.svg` — logo (sumber ikon taskbar & tray);
+  setelah mengganti PNG jalankan `just icon`
+- `icon.rgba` / `icon-tray.rgba` — hasil konversi (di-embed)
+
+## CSS
+
+- `input.css` — sumber Tailwind; regenerate `tailwind.css` via `just css`

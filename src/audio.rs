@@ -1,6 +1,11 @@
+use std::io::Cursor;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
-use std::time::Duration;
+
+/// Adzan bawaan aplikasi (di-embed dari assets/ — selalu tersedia walau
+/// exe dipindah tanpa folder assets).
+pub static DEFAULT_ADZAN: &[u8] = include_bytes!("../assets/adzan.mp3");
+pub static DEFAULT_ADZAN_SUBUH: &[u8] = include_bytes!("../assets/adzan-subuh.mp3");
 
 /// Player yang sedang memutar tes/adzan. Play baru menghentikan yang lama,
 /// dan bisa di-stop manual lewat [`stop_current`].
@@ -31,8 +36,10 @@ pub fn resolve_subuh(settings: &crate::settings::Settings) -> Option<PathBuf> {
         return Some(p.clone());
     }
     let fallback = resolve_adzan(settings);
-    candidates("adzan_subuh.mp3")
-        .into_iter()
+    ["adzan-subuh.mp3", "adzan_subuh.mp3"]
+        .iter()
+        .map(|name| candidates(name))
+        .flatten()
         .find(|p| p.exists())
         .or(fallback)
 }
@@ -48,6 +55,32 @@ fn candidates(filename: &str) -> Vec<PathBuf> {
     out.push(crate::settings::config_dir().join(filename));
     out.push(PathBuf::from("assets").join(filename));
     out
+}
+
+/// Putar data audio dari memori (dipakai untuk adzan bawaan).
+pub fn play_bytes(bytes: &'static [u8], volume: f32) -> Result<(), String> {
+    stop_current();
+    let sink = rodio::DeviceSinkBuilder::open_default_sink()
+        .map_err(|e| format!("perangkat audio tidak tersedia: {e}"))?;
+    let player = Arc::new(
+        rodio::play(sink.mixer(), Cursor::new(bytes))
+            .map_err(|e| format!("gagal decode adzan bawaan: {e}"))?,
+    );
+    player.set_volume(volume.clamp(0.0, 1.0));
+    *CURRENT_PLAYER.lock().unwrap() = Some(player.clone());
+
+    std::thread::Builder::new()
+        .name("adzan-audio".into())
+        .spawn(move || {
+            let _sink = sink;
+            player.sleep_until_end();
+            let mut current = CURRENT_PLAYER.lock().unwrap();
+            if current.as_ref().is_some_and(|p| Arc::ptr_eq(p, &player)) {
+                *current = None;
+            }
+        })
+        .map_err(|e| format!("gagal spawn thread audio: {e}"))?;
+    Ok(())
 }
 
 /// Putar file audio — hanya satu pemutaran pada satu waktu:
@@ -82,39 +115,8 @@ pub fn play_file(path: &Path, volume: f32) -> Result<(), String> {
     Ok(())
 }
 
-/// Fallback: bunyi "beep" 3x jika tidak ada file adzan sama sekali,
-/// supaya aplikasi tetap memberi tanda saat masuk waktu sholat.
-pub fn play_fallback_beep(volume: f32) -> Result<(), String> {
-    use rodio::source::{SineWave, Source};
-    stop_current();
-    let sink = rodio::DeviceSinkBuilder::open_default_sink()
-        .map_err(|e| format!("perangkat audio tidak tersedia: {e}"))?;
-    let player = Arc::new(rodio::Player::connect_new(sink.mixer()));
-    player.set_volume(volume.clamp(0.0, 1.0) * 0.6);
-    for _ in 0..3 {
-        let beep = SineWave::new(880.0)
-            .take_duration(Duration::from_millis(350))
-            .amplify(1.0);
-        player.append(beep);
-        std::thread::sleep(Duration::from_millis(50));
-    }
-    *CURRENT_PLAYER.lock().unwrap() = Some(player.clone());
-
-    std::thread::Builder::new()
-        .name("adzan-beep".into())
-        .spawn(move || {
-            let _sink = sink;
-            player.sleep_until_end();
-            let mut current = CURRENT_PLAYER.lock().unwrap();
-            if current.as_ref().is_some_and(|p| Arc::ptr_eq(p, &player)) {
-                *current = None;
-            }
-        })
-        .map_err(|e| format!("gagal spawn thread audio: {e}"))?;
-    Ok(())
-}
-
-/// Pilih sumber audio untuk sholat tertentu dan putar.
+/// Pilih sumber audio untuk sholat tertentu dan putar:
+/// file kustom (settings) → file di folder assets → adzan bawaan (embed).
 /// Kembalikan deskripsi sumber untuk logging/status UI.
 pub fn play_adzan(settings: &crate::settings::Settings, subuh: bool) -> Result<String, String> {
     let source = if subuh {
@@ -128,8 +130,13 @@ pub fn play_adzan(settings: &crate::settings::Settings, subuh: bool) -> Result<S
             Ok(format!("memutar {}", path.display()))
         }
         None => {
-            play_fallback_beep(settings.volume)?;
-            Ok("memutar beep fallback (file adzan belum diatur)".to_string())
+            let bytes = if subuh {
+                DEFAULT_ADZAN_SUBUH
+            } else {
+                DEFAULT_ADZAN
+            };
+            play_bytes(bytes, settings.volume)?;
+            Ok("memutar adzan bawaan".to_string())
         }
     }
 }
