@@ -1,0 +1,6 @@
+/target
+/dist
+/.dx
+/.zcode
+node_modules/
+*.log

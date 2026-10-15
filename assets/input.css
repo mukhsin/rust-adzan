@@ -1,0 +1,27 @@
+@import "tailwindcss";
+
+/* Dark mode berbasis class (toggle di title bar), bukan prefers-color-scheme. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* Kelas Tailwind dipindai dari source rsx. */
+@source "../src/**/*.rs";
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  overflow: hidden;
+}
+
+/* Scrollbar tipis untuk daftar jadwal & settings. */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-thumb {
+  background: rgb(161 161 170 / 0.35);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}

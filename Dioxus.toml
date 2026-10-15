@@ -1,0 +1,7 @@
+# Konfigurasi dx CLI (dx serve / dx bundle).
+# Aplikasi desktop-only: jalankan dengan `cargo run` atau `dx serve`.
+[application]
+name = "rust-adzan"
+
+[bundle]
+identifier = "id.mukhsin.rust-adzan"
