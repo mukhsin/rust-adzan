@@ -21,15 +21,19 @@ const BTN_ICON: &str = "p-1.5 rounded-lg border border-zinc-200 dark:border-zinc
 pub fn SettingsView() -> Element {
     // Draft lokal; setiap perubahan langsung disimpan + disebarkan.
     let mut draft = use_signal(|| (*state::settings()).clone());
-    let mut status = use_signal(String::new);
-    // Status pemutaran audio (di-refresh berkala agar ikon play/stop akurat).
-    let mut playing = use_signal(crate::audio::is_playing);
+    // Status pemutaran per slot (di-poll berkala agar ikon play/stop akurat).
+    let mut playing_umum = use_signal(|| crate::audio::is_playing(crate::audio::Slot::Umum));
+    let mut playing_subuh = use_signal(|| crate::audio::is_playing(crate::audio::Slot::Subuh));
     use_future(move || async move {
         loop {
             tokio::time::sleep(std::time::Duration::from_millis(250)).await;
-            let now = crate::audio::is_playing();
-            if *playing.read() != now {
-                playing.set(now);
+            let umum = crate::audio::is_playing(crate::audio::Slot::Umum);
+            if *playing_umum.read() != umum {
+                playing_umum.set(umum);
+            }
+            let subuh = crate::audio::is_playing(crate::audio::Slot::Subuh);
+            if *playing_subuh.read() != subuh {
+                playing_subuh.set(subuh);
             }
         }
     });
@@ -196,24 +200,20 @@ pub fn SettingsView() -> Element {
                         }
                         button {
                             class: "{BTN_ICON}",
-                            title: if *playing.read() {
+                            title: if *playing_umum.read() {
                                 "Hentikan pemutaran"
                             } else {
                                 "Tes putar adzan"
                             },
                             onclick: move |_| {
-                                if *playing.read() {
-                                    crate::audio::stop_current();
-                                    status.set("⏹ pemutaran dihentikan".into());
+                                if *playing_umum.read() {
+                                    crate::audio::stop_slot(crate::audio::Slot::Umum);
                                 } else {
                                     let s = state::settings();
-                                    match crate::audio::play_adzan(&s, false) {
-                                        Ok(_) => status.set("▶ memutar adzan…".into()),
-                                        Err(e) => status.set(format!("✕ {e}")),
-                                    }
+                                    let _ = crate::audio::play_adzan(&s, false);
                                 }
                             },
-                            if *playing.read() {
+                            if *playing_umum.read() {
                                 icons::IconSquare { class: "w-3.5 h-3.5" }
                             } else {
                                 icons::IconPlay { class: "w-3.5 h-3.5" }
@@ -236,24 +236,20 @@ pub fn SettingsView() -> Element {
                         }
                         button {
                             class: "{BTN_ICON}",
-                            title: if *playing.read() {
+                            title: if *playing_subuh.read() {
                                 "Hentikan pemutaran"
                             } else {
                                 "Tes putar adzan Subuh"
                             },
                             onclick: move |_| {
-                                if *playing.read() {
-                                    crate::audio::stop_current();
-                                    status.set("⏹ pemutaran dihentikan".into());
+                                if *playing_subuh.read() {
+                                    crate::audio::stop_slot(crate::audio::Slot::Subuh);
                                 } else {
                                     let s = state::settings();
-                                    match crate::audio::play_adzan(&s, true) {
-                                        Ok(_) => status.set("▶ memutar adzan subuh…".into()),
-                                        Err(e) => status.set(format!("✕ {e}")),
-                                    }
+                                    let _ = crate::audio::play_adzan(&s, true);
                                 }
                             },
-                            if *playing.read() {
+                            if *playing_subuh.read() {
                                 icons::IconSquare { class: "w-3.5 h-3.5" }
                             } else {
                                 icons::IconPlay { class: "w-3.5 h-3.5" }
@@ -316,15 +312,17 @@ pub fn SettingsView() -> Element {
                                     s.autostart = on;
                                     apply(s);
                                 }
-                                Err(err) => status.set(format!("✕ {err}")),
+                                Err(err) => {
+                                    rfd::MessageDialog::new()
+                                        .set_title("Auto-start")
+                                        .set_level(rfd::MessageLevel::Error)
+                                        .set_description(&err)
+                                        .show();
+                                }
                             }
                         },
                     }
                 }
-            }
-
-            if !status.read().is_empty() {
-                div { class: "text-xs text-zinc-400 dark:text-zinc-500 px-1 pb-2", "{status.read()}" }
             }
         }
     }

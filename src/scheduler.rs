@@ -109,7 +109,7 @@ fn execute(action: Action, settings: &Settings) {
         Action::PlayAdzan(kind) => {
             let subuh = kind == PrayerKind::Subuh;
             match crate::audio::play_adzan(settings, subuh) {
-                Ok(desc) => println!("[adzan] {kind:?}: {desc}"),
+                Ok(()) => println!("[adzan] {kind:?}: diputar"),
                 Err(e) => eprintln!("[adzan] gagal memutar audio: {e}"),
             }
         }
