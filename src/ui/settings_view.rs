@@ -198,18 +198,6 @@ pub fn SettingsView() -> Element {
                             },
                             "Pilih…"
                         }
-                        if draft.read().adzan_file.is_some() {
-                            button {
-                                class: "{BTN_ICON}",
-                                title: "Kembali ke adzan bawaan",
-                                onclick: move |_| {
-                                    let mut s = draft.read().clone();
-                                    s.adzan_file = None;
-                                    apply(s);
-                                },
-                                icons::IconClose { class: "w-3.5 h-3.5" }
-                            }
-                        }
                         button {
                             class: "{BTN_ICON}",
                             title: if *playing_umum.read() {
@@ -245,18 +233,6 @@ pub fn SettingsView() -> Element {
                                 }
                             },
                             "Pilih…"
-                        }
-                        if draft.read().subuh_file.is_some() {
-                            button {
-                                class: "{BTN_ICON}",
-                                title: "Kembali ke adzan Subuh bawaan",
-                                onclick: move |_| {
-                                    let mut s = draft.read().clone();
-                                    s.subuh_file = None;
-                                    apply(s);
-                                },
-                                icons::IconClose { class: "w-3.5 h-3.5" }
-                            }
                         }
                         button {
                             class: "{BTN_ICON}",
@@ -348,6 +324,29 @@ pub fn SettingsView() -> Element {
                     }
                 }
             }
+
+            div { class: "flex justify-center pt-1 pb-2",
+                button {
+                    class: "px-3 py-1.5 rounded-lg text-xs font-medium border border-red-300 dark:border-red-900/60 text-red-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors",
+                    onclick: move |_| {
+                        let confirm = rfd::MessageDialog::new()
+                            .set_title("Reset semua pengaturan")
+                            .set_level(rfd::MessageLevel::Warning)
+                            .set_description(
+                                "Kembalikan SEMUA pengaturan ke bawaan (lokasi, audio, notifikasi, tema, auto-start)?",
+                            )
+                            .set_buttons(rfd::MessageButtons::YesNo)
+                            .show();
+                        if confirm == rfd::MessageDialogResult::Yes {
+                            let _ = autostart::set_enabled(false);
+                            let s = Settings::default();
+                            state::update_settings(s.clone());
+                            draft.set(s);
+                        }
+                    },
+                    "Reset semua pengaturan"
+                }
+            }
         }
     }
 }
@@ -428,15 +427,20 @@ fn deskripsi_sumber(s: &Settings, subuh: bool) -> String {
     };
     match resolved {
         Some(p) => {
+            // Cukup nama file — full path terlalu panjang untuk card yang sempit.
+            let nama = p
+                .file_name()
+                .map(|n| n.to_string_lossy().to_string())
+                .unwrap_or_else(|| p.display().to_string());
             let kustom = if subuh {
                 s.subuh_file.as_ref() == Some(&p)
             } else {
                 s.adzan_file.as_ref() == Some(&p)
             };
             if kustom {
-                format!("Kustom: {}", p.display())
+                format!("Kustom: {nama}")
             } else {
-                format!("File: {}", p.display())
+                format!("File: {nama}")
             }
         }
         None => "Bawaan (ter-embed)".to_string(),
