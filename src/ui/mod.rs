@@ -33,7 +33,38 @@ pub enum View {
 
 pub fn app() -> Element {
     let mut view = use_signal(|| View::Main);
-    let theme = use_signal(|| state::settings().theme);
+    let mut theme = use_signal(|| state::settings().theme);
+
+    // Sinkronkan tema dari dom lain (mis. toggle di widget window) tiap detik.
+    let mut sync_tick = use_signal(|| 0u64);
+    use_future(move || async move {
+        loop {
+            tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+            sync_tick += 1;
+        }
+    });
+    let _ = sync_tick();
+    if *theme.read() != state::settings().theme {
+        theme.set(state::settings().theme);
+    }
+
+    // Perintah lintas window: tombol Pengaturan di widget membuka main window.
+    use_future(move || async move {
+        loop {
+            tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+            while let Some(cmd) = state::pop_main_command() {
+                match cmd {
+                    state::MainCommand::OpenSettings => {
+                        view.set(View::Settings);
+                        let win = dioxus::desktop::window();
+                        win.set_minimized(false);
+                        win.set_visible(true);
+                        win.set_focus();
+                    }
+                }
+            }
+        }
+    });
 
     let mut root_class = String::from(
         "h-screen w-screen flex flex-col overflow-hidden font-sans \
@@ -150,9 +181,18 @@ pub fn TitleBar(
                 }
                 button {
                     class: "p-1.5 rounded-md hover:bg-red-500 hover:text-white dark:hover:bg-red-500 dark:hover:text-white text-zinc-500 dark:text-zinc-400 transition-colors",
-                    title: "Tutup (ke tray)",
+                    title: "Tutup (lanjut di widget)",
                     onmousedown: move |e| e.stop_propagation(),
-                    onclick: move |_| dioxus::desktop::window().set_visible(false),
+                    onclick: move |_| {
+                        // Tutup main window → widget tampil sebagai gantinya.
+                        dioxus::desktop::window().set_visible(false);
+                        set_widget_visible(true);
+                        WIDGET_MENU_ITEM.with(|cell| {
+                            if let Some(item) = cell.borrow().as_ref() {
+                                item.set_checked(true);
+                            }
+                        });
+                    },
                     icons::IconClose { class: "w-3.5 h-3.5" }
                 }
             }
@@ -226,11 +266,11 @@ fn TraySetup() -> Element {
     rsx! {}
 }
 
-/// Buat widget window tersembunyi saat startup; visibilitas mengikuti settings.
+/// Buat widget window tersembunyi saat startup. Widget muncul saat main window
+/// ditutup, lewat klik kiri tray, atau menu "Widget Desktop".
 #[component]
 fn WidgetSetup() -> Element {
     use_hook(|| {
-        let initial_visible = state::settings().widget_enabled;
         spawn(async move {
             let main_win = dioxus::desktop::window();
             let mut builder = WindowBuilder::new()
@@ -261,14 +301,6 @@ fn WidgetSetup() -> Element {
                 .new_window(VirtualDom::new(widget::WidgetApp), cfg)
                 .await;
             *state::WIDGET_WINDOW.lock().unwrap() = Some(ctx.window.clone());
-            if initial_visible {
-                WIDGET_MENU_ITEM.with(|cell| {
-                    if let Some(item) = cell.borrow().as_ref() {
-                        item.set_checked(true);
-                    }
-                });
-                ctx.window.set_visible(true);
-            }
         });
     });
     rsx! {}
@@ -279,12 +311,12 @@ pub fn set_widget_visible(visible: bool) {
     if let Some(w) = state::WIDGET_WINDOW.lock().unwrap().as_ref() {
         w.set_visible(visible);
         if visible {
-            let _ = w.set_focus();
+            w.set_focus();
         }
     }
 }
 
-/// Toggle visibilitas widget + sinkronkan centang menu tray dan settings.
+/// Toggle visibilitas widget + sinkronkan centang menu tray.
 /// Hanya dipanggil dari main thread (handler event tray).
 fn toggle_widget() {
     let visible = match state::WIDGET_WINDOW.lock().unwrap().as_ref() {
@@ -297,7 +329,4 @@ fn toggle_widget() {
             item.set_checked(visible);
         }
     });
-    let mut s = (*state::settings()).clone();
-    s.widget_enabled = visible;
-    state::update_settings(s);
 }

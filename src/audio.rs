@@ -4,19 +4,19 @@ use std::time::Duration;
 /// Cari file adzan: pakai file dari settings jika ada; kalau tidak, cari
 /// `assets/adzan.mp3` di dekat exe / dir config / cwd.
 pub fn resolve_adzan(settings: &crate::settings::Settings) -> Option<PathBuf> {
-    if let Some(p) = &settings.adzan_file {
-        if p.exists() {
-            return Some(p.clone());
-        }
+    if let Some(p) = &settings.adzan_file
+        && p.exists()
+    {
+        return Some(p.clone());
     }
     candidates("adzan.mp3").into_iter().find(|p| p.exists())
 }
 
 pub fn resolve_subuh(settings: &crate::settings::Settings) -> Option<PathBuf> {
-    if let Some(p) = &settings.subuh_file {
-        if p.exists() {
-            return Some(p.clone());
-        }
+    if let Some(p) = &settings.subuh_file
+        && p.exists()
+    {
+        return Some(p.clone());
     }
     let fallback = resolve_adzan(settings);
     candidates("adzan_subuh.mp3")
@@ -27,11 +27,11 @@ pub fn resolve_subuh(settings: &crate::settings::Settings) -> Option<PathBuf> {
 
 fn candidates(filename: &str) -> Vec<PathBuf> {
     let mut out = Vec::new();
-    if let Ok(exe) = std::env::current_exe() {
-        if let Some(dir) = exe.parent() {
-            out.push(dir.join("assets").join(filename));
-            out.push(dir.join(filename));
-        }
+    if let Ok(exe) = std::env::current_exe()
+        && let Some(dir) = exe.parent()
+    {
+        out.push(dir.join("assets").join(filename));
+        out.push(dir.join(filename));
     }
     out.push(crate::settings::config_dir().join(filename));
     out.push(PathBuf::from("assets").join(filename));

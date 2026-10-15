@@ -17,12 +17,16 @@ lokal, tidak butuh internet).
   opsional; fallback bunyi beep jika file belum diatur.
 - **Countdown** — hitung mundur real-time ke sholat berikutnya
   (setelah Isya mengarah ke Subuh esok hari).
-- **System tray** — tutup/minimize hanya menyembunyikan window;
-  aplikasi tetap berjalan di tray (menu: tampilkan, widget, keluar).
+- **System tray** — klik kiri ikon tray men-toggle widget; klik kanan membuka
+  menu (tampilkan main window, widget, keluar). Aplikasi tetap berjalan
+  di tray.
+- **Alur window** — buka aplikasi → main window. Tutup main window →
+  widget muncul sebagai gantinya. Tutup widget → semua tersimpan di tray.
 - **Notifikasi** — toast Windows saat pengingat X menit sebelum adzan
   dan saat masuk waktu.
 - **Widget desktop** — jendela melayang kecil yang selalu di atas,
-  menampilkan jadwal ringkas + countdown.
+  menampilkan lokasi, tanggal, dan countdown (dengan toggle tema +
+  pintasan pengaturan di title bar).
 - **Auto-start** — opsi menjalankan otomatis saat Windows menyala
   (registry HKCU, tanpa hak admin).
 - **Settings tersimpan** — `%APPDATA%\rust-adzan\config.json`.

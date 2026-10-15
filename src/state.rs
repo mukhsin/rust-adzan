@@ -4,6 +4,32 @@ use std::sync::{Arc, Mutex, OnceLock, RwLock};
 /// Settings global yang dibagikan antara UI utama, widget, dan scheduler thread.
 static SETTINGS: OnceLock<RwLock<Arc<Settings>>> = OnceLock::new();
 
+/// Perintah UI lintas window (dari dom widget → dom utama).
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum MainCommand {
+    /// Buka window utama pada tampilan Pengaturan.
+    OpenSettings,
+}
+
+static MAIN_CMD_TX: OnceLock<tokio::sync::mpsc::UnboundedSender<MainCommand>> = OnceLock::new();
+static MAIN_CMD_RX: OnceLock<Mutex<tokio::sync::mpsc::UnboundedReceiver<MainCommand>>> =
+    OnceLock::new();
+
+/// Kirim perintah ke window utama (aman dipanggil dari dom mana pun).
+pub fn send_main_command(cmd: MainCommand) {
+    let tx = MAIN_CMD_TX.get_or_init(|| {
+        let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
+        let _ = MAIN_CMD_RX.set(Mutex::new(rx));
+        tx
+    });
+    let _ = tx.send(cmd);
+}
+
+/// Ambil satu perintah yang tertunda (dipoll window utama tiap 100 ms).
+pub fn pop_main_command() -> Option<MainCommand> {
+    MAIN_CMD_RX.get()?.lock().unwrap().try_recv().ok()
+}
+
 /// Handle tao Window milik widget (dibuat tersembunyi saat startup, di-show/hide sesuai setting).
 pub static WIDGET_WINDOW: Mutex<Option<Arc<dioxus::desktop::tao::window::Window>>> =
     Mutex::new(None);

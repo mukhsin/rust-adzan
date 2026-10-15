@@ -3,21 +3,16 @@ use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
 /// Metode perhitungan jadwal sholat.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub enum CalcMethod {
     /// Kemenag Indonesia: Subuh 20°, Isya 18° (preset "Singapore" di crate salah).
+    #[default]
     Kemenag,
     MuslimWorldLeague,
     Egyptian,
     Karachi,
     UmmAlQura,
     NorthAmerica,
-}
-
-impl Default for CalcMethod {
-    fn default() -> Self {
-        Self::Kemenag
-    }
 }
 
 /// Mazhab untuk perhitungan waktu Ashar.
@@ -66,7 +61,6 @@ pub struct Settings {
     /// Berapa menit sebelum adzan dikirim notifikasi pengingat.
     pub pre_notif_minutes: u32,
 
-    pub widget_enabled: bool,
     pub autostart: bool,
     pub theme: Theme,
 }
@@ -87,7 +81,6 @@ impl Default for Settings {
             volume: 0.9,
             notif_enabled: true,
             pre_notif_minutes: 10,
-            widget_enabled: false,
             autostart: false,
             theme: Theme::Dark,
         }
@@ -155,7 +148,7 @@ mod tests {
         s.madhab = MadhabChoice::Hanafi;
         s.volume = 0.42;
         s.pre_notif_minutes = 15;
-        s.widget_enabled = true;
+        s.theme = Theme::Light;
 
         let json = serde_json::to_string(&s).unwrap();
         let back: Settings = serde_json::from_str(&json).unwrap();

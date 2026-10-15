@@ -19,7 +19,7 @@ const BTN_GHOST: &str = "px-3 py-1.5 rounded-lg text-xs font-medium border borde
 pub fn SettingsView() -> Element {
     // Draft lokal; setiap perubahan langsung disimpan + disebarkan.
     let mut draft = use_signal(|| (*state::settings()).clone());
-    let mut status = use_signal(|| String::new());
+    let mut status = use_signal(String::new);
 
     let mut apply = move |s: Settings| {
         crate::settings::save(&s);
@@ -253,22 +253,6 @@ pub fn SettingsView() -> Element {
 
             div { class: "text-xs uppercase tracking-wider text-zinc-400 dark:text-zinc-500 font-medium px-1", "Lainnya" }
             div { class: "bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 rounded-xl p-4 flex flex-col gap-3",
-                Field { label: "Widget desktop (selalu di atas)",
-                    Switch {
-                        checked: draft.read().widget_enabled,
-                        on_change: move |on| {
-                            crate::ui::set_widget_visible(on);
-                            crate::state::WIDGET_MENU_ITEM.with(|cell| {
-                                if let Some(item) = cell.borrow().as_ref() {
-                                    item.set_checked(on);
-                                }
-                            });
-                            let mut s = draft.read().clone();
-                            s.widget_enabled = on;
-                            apply(s);
-                        },
-                    }
-                }
                 Field { label: "Jalankan saat Windows menyala",
                     Switch {
                         checked: draft.read().autostart,
