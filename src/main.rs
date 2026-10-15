@@ -5,6 +5,7 @@
 mod audio;
 mod autostart;
 mod cities;
+mod logger;
 mod notify;
 mod prayer;
 mod scheduler;
@@ -15,9 +16,12 @@ mod ui;
 use dioxus::desktop::{Config, WindowBuilder, WindowCloseBehaviour, tao::dpi::LogicalSize};
 
 fn main() {
+    logger::init();
+
     // Muat settings ke global + nyalakan engine adzan (thread terpisah).
     let _ = state::settings();
     scheduler::start();
+    logger::info("aplikasi dimulai");
 
     // Sinkronkan auto-start dengan settings (memperbarui path exe yang bisa usang).
     if state::settings().autostart {
@@ -31,7 +35,7 @@ fn main() {
     let config = Config::new()
         .with_window(
             WindowBuilder::new()
-                .with_title("Rust Adzan")
+                .with_title(crate::settings::APP_NAME)
                 .with_decorations(false) // frameless: title bar custom di ui::TitleBar
                 .with_inner_size(LogicalSize::new(400.0, 700.0))
                 .with_min_inner_size(LogicalSize::new(380.0, 620.0)),

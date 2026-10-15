@@ -13,6 +13,6 @@ pub fn show(title: &str, body: &str) {
         .sound(Some(Sound::Default))
         .show();
     if let Err(e) = result {
-        eprintln!("Notifikasi gagal: {e}");
+        crate::logger::error(&format!("notifikasi gagal: {e}"));
     }
 }

@@ -2,6 +2,9 @@ use chrono_tz::Tz;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
+/// Nama aplikasi yang tampil ke user (judul window native, taskbar, dll).
+pub const APP_NAME: &str = "Jadwal Sholat";
+
 /// Metode perhitungan jadwal sholat.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub enum CalcMethod {
@@ -98,10 +101,16 @@ impl Settings {
     }
 }
 
-/// Direktori config: %APPDATA%\rust-adzan
+/// Direktori config & log: %APPDATA%\jadwal-sholat
+/// (migrasi otomatis dari nama folder lama `rust-adzan`).
 pub fn config_dir() -> PathBuf {
     let base = dirs::config_dir().unwrap_or_else(|| PathBuf::from("."));
-    let dir = base.join("rust-adzan");
+    let dir = base.join("jadwal-sholat");
+    let legacy = base.join("rust-adzan");
+    if !dir.exists() && legacy.exists() {
+        // Pindahkan settings lama ke folder baru.
+        let _ = std::fs::rename(&legacy, &dir);
+    }
     let _ = std::fs::create_dir_all(&dir);
     dir
 }
@@ -114,7 +123,7 @@ pub fn load() -> Settings {
     let path = config_path();
     match std::fs::read_to_string(&path) {
         Ok(text) => serde_json::from_str(&text).unwrap_or_else(|e| {
-            eprintln!("Gagal membaca config ({e}); memakai default.");
+            crate::logger::error(&format!("gagal membaca config ({e}); memakai default"));
             Settings::default()
         }),
         Err(_) => Settings::default(),
@@ -126,10 +135,10 @@ pub fn save(settings: &Settings) {
     match serde_json::to_string_pretty(settings) {
         Ok(text) => {
             if let Err(e) = std::fs::write(&path, text) {
-                eprintln!("Gagal menyimpan config: {e}");
+                crate::logger::error(&format!("gagal menyimpan config: {e}"));
             }
         }
-        Err(e) => eprintln!("Gagal serialisasi config: {e}"),
+        Err(e) => crate::logger::error(&format!("gagal serialisasi config: {e}")),
     }
 }
 

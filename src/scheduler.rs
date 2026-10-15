@@ -91,6 +91,7 @@ pub fn start() {
     std::thread::Builder::new()
         .name("adzan-scheduler".into())
         .spawn(|| {
+            crate::logger::info("scheduler adzan mulai");
             let mut state = EngineState::new();
             loop {
                 let settings = crate::state::settings();
@@ -109,8 +110,12 @@ fn execute(action: Action, settings: &Settings) {
         Action::PlayAdzan(kind) => {
             let subuh = kind == PrayerKind::Subuh;
             match crate::audio::play_adzan(settings, subuh) {
-                Ok(()) => println!("[adzan] {kind:?}: diputar"),
-                Err(e) => eprintln!("[adzan] gagal memutar audio: {e}"),
+                Ok(()) => {
+                    crate::logger::info(&format!("masuk waktu {}: adzan diputar", kind.nama()))
+                }
+                Err(e) => {
+                    crate::logger::error(&format!("gagal memutar adzan {}: {e}", kind.nama()))
+                }
             }
         }
         Action::NotifyAdzan(kind) => {
@@ -118,12 +123,17 @@ fn execute(action: Action, settings: &Settings) {
                 "Masuk waktu sholat",
                 &format!("Telah masuk waktu sholat {}. Mari sholat. 🕌", kind.nama()),
             );
+            crate::logger::info(&format!("notifikasi masuk waktu {}", kind.nama()));
         }
         Action::NotifyPre { kind, minutes } => {
             crate::notify::show(
                 "Pengingat adzan",
                 &format!("{} menit lagi masuk waktu sholat {}.", minutes, kind.nama()),
             );
+            crate::logger::info(&format!(
+                "notifikasi pengingat {} ({minutes} menit)",
+                kind.nama()
+            ));
         }
     }
 }

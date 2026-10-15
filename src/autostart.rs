@@ -2,7 +2,8 @@ use winreg::RegKey;
 use winreg::enums::{HKEY_CURRENT_USER, KEY_QUERY_VALUE, KEY_SET_VALUE};
 
 const RUN_KEY: &str = r"Software\Microsoft\Windows\CurrentVersion\Run";
-const VALUE_NAME: &str = "RustAdzan";
+const VALUE_NAME: &str = "JadwalSholat";
+const LEGACY_VALUE_NAME: &str = "RustAdzan";
 
 /// Set/hapus auto-start via registry HKCU Run (tidak butuh hak admin).
 pub fn set_enabled(enable: bool) -> Result<(), String> {
@@ -20,5 +21,7 @@ pub fn set_enabled(enable: bool) -> Result<(), String> {
         // Tidak masalah jika value tidak ada.
         let _ = key.delete_value(VALUE_NAME);
     }
+    // Bersihkan value dari nama aplikasi lama (jika ada).
+    let _ = key.delete_value(LEGACY_VALUE_NAME);
     Ok(())
 }
