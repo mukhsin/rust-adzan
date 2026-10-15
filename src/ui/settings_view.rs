@@ -185,7 +185,7 @@ pub fn SettingsView() -> Element {
                         },
                     }
                 }
-                Field { label: "File adzan", hint: "Kosong = adzan bawaan aplikasi",
+                Field { label: "File adzan", hint: deskripsi_sumber(&draft.read(), false),
                     div { class: "flex items-center gap-1.5",
                         button {
                             class: "{BTN_GHOST}",
@@ -233,7 +233,7 @@ pub fn SettingsView() -> Element {
                         }
                     }
                 }
-                Field { label: "File khusus Subuh", hint: "Opsional; kosong = adzan Subuh bawaan",
+                Field { label: "File khusus Subuh", hint: deskripsi_sumber(&draft.read(), true),
                     div { class: "flex items-center gap-1.5",
                         button {
                             class: "{BTN_GHOST}",
@@ -416,4 +416,29 @@ fn pick_audio() -> Option<PathBuf> {
         .add_filter("Audio", &["mp3", "wav", "ogg", "flac", "m4a", "aac"])
         .set_title("Pilih file adzan")
         .pick_file()
+}
+
+/// Deskripsi sumber audio aktif saat ini (kustom / file / bawaan ter-embed)
+/// untuk ditampilkan di settings. `subuh` memilih baris mana yang dideskripsi.
+fn deskripsi_sumber(s: &Settings, subuh: bool) -> String {
+    let resolved = if subuh {
+        crate::audio::resolve_subuh(s)
+    } else {
+        crate::audio::resolve_adzan(s)
+    };
+    match resolved {
+        Some(p) => {
+            let kustom = if subuh {
+                s.subuh_file.as_ref() == Some(&p)
+            } else {
+                s.adzan_file.as_ref() == Some(&p)
+            };
+            if kustom {
+                format!("Kustom: {}", p.display())
+            } else {
+                format!("File: {}", p.display())
+            }
+        }
+        None => "Bawaan (ter-embed)".to_string(),
+    }
 }
