@@ -48,14 +48,13 @@ pub fn app() -> Element {
         theme.set(state::settings().theme);
     }
 
-    // Perintah lintas window: tombol Pengaturan di widget membuka main window.
+    // Perintah lintas window: tombol jam di widget menampilkan main window.
     use_future(move || async move {
         loop {
             tokio::time::sleep(std::time::Duration::from_millis(100)).await;
             while let Some(cmd) = state::pop_main_command() {
                 match cmd {
-                    state::MainCommand::OpenSettings => {
-                        view.set(View::Settings);
+                    state::MainCommand::ShowMain => {
                         let win = dioxus::desktop::window();
                         win.set_minimized(false);
                         win.set_visible(true);
@@ -84,7 +83,6 @@ pub fn app() -> Element {
     rsx! {
         style { {TAILWIND_CSS} }
         TraySetup {}
-        WidgetSetup {}
         div { class: "{root_class}",
             TitleBar {
                 title,
@@ -183,16 +181,7 @@ pub fn TitleBar(
                     class: "p-1.5 rounded-md hover:bg-red-500 hover:text-white dark:hover:bg-red-500 dark:hover:text-white text-zinc-500 dark:text-zinc-400 transition-colors",
                     title: "Tutup (lanjut di widget)",
                     onmousedown: move |e| e.stop_propagation(),
-                    onclick: move |_| {
-                        // Tutup main window → widget tampil sebagai gantinya.
-                        dioxus::desktop::window().set_visible(false);
-                        set_widget_visible(true);
-                        WIDGET_MENU_ITEM.with(|cell| {
-                            if let Some(item) = cell.borrow().as_ref() {
-                                item.set_checked(true);
-                            }
-                        });
-                    },
+                    onclick: move |_| show_widget_only(),
                     icons::IconClose { class: "w-3.5 h-3.5" }
                 }
             }
@@ -247,12 +236,7 @@ fn TraySetup() -> Element {
     // dioxus untuk `tray_icon::menu::MenuEvent` gagal diam-diam. Karena itu
     // `use_tray_menu_event_handler` tidak pernah terpanggil.
     use_muda_event_handler(move |event| match event.id().0.as_str() {
-        "show" => {
-            let win = dioxus::desktop::window();
-            win.set_minimized(false);
-            win.set_visible(true);
-            win.set_focus();
-        }
+        "show" => show_main_only(),
         "widget" => toggle_widget(),
         "quit" => {
             if let Some(tray) = &tray {
@@ -266,67 +250,97 @@ fn TraySetup() -> Element {
     rsx! {}
 }
 
-/// Buat widget window tersembunyi saat startup. Widget muncul saat main window
-/// ditutup, lewat klik kiri tray, atau menu "Widget Desktop".
-#[component]
-fn WidgetSetup() -> Element {
-    use_hook(|| {
-        spawn(async move {
-            let main_win = dioxus::desktop::window();
-            let mut builder = WindowBuilder::new()
-                .with_decorations(false)
-                .with_resizable(false)
-                .with_always_on_top(true)
-                .with_skip_taskbar(true)
-                .with_visible(false)
-                .with_inner_size(LogicalSize::new(300.0, 280.0));
+/// Buat widget window (lazy — dipanggil saat pertama kali widget dibutuhkan).
+/// Setelah webview selesai load, dioxus otomatis memvisibilitaskan window ini
+/// (flag app-level `is_visible_before_start`), pas dengan saat ia diminta tampil.
+fn spawn_widget_creation() {
+    spawn(async move {
+        let main_win = dioxus::desktop::window();
+        let mut builder = WindowBuilder::new()
+            .with_decorations(false)
+            .with_resizable(false)
+            .with_always_on_top(true)
+            .with_skip_taskbar(true)
+            .with_visible(false)
+            .with_inner_size(LogicalSize::new(300.0, 280.0));
 
-            // Posisikan di pojok kanan-bawah layar.
-            if let Some(monitor) = main_win.current_monitor() {
-                let scale = monitor.scale_factor();
-                let size = monitor.size();
-                let w = (300.0 * scale) as i32;
-                let h = (280.0 * scale) as i32;
-                let x = size.width as i32 - w - (12.0 * scale) as i32;
-                let y = size.height as i32 - h - (80.0 * scale) as i32;
-                builder =
-                    builder.with_position(LogicalPosition::new(x as f64 / scale, y as f64 / scale));
-            }
+        // Posisikan di pojok kanan-bawah layar.
+        if let Some(monitor) = main_win.current_monitor() {
+            let scale = monitor.scale_factor();
+            let size = monitor.size();
+            let w = (300.0 * scale) as i32;
+            let h = (280.0 * scale) as i32;
+            let x = size.width as i32 - w - (12.0 * scale) as i32;
+            let y = size.height as i32 - h - (80.0 * scale) as i32;
+            builder =
+                builder.with_position(LogicalPosition::new(x as f64 / scale, y as f64 / scale));
+        }
 
-            let cfg = Config::new()
-                .with_window(builder)
-                .with_exits_when_last_window_closes(false);
+        let cfg = Config::new()
+            .with_window(builder)
+            .with_exits_when_last_window_closes(false);
 
-            let ctx = main_win
-                .new_window(VirtualDom::new(widget::WidgetApp), cfg)
-                .await;
-            *state::WIDGET_WINDOW.lock().unwrap() = Some(ctx.window.clone());
-        });
+        let ctx = main_win
+            .new_window(VirtualDom::new(widget::WidgetApp), cfg)
+            .await;
+        *state::WIDGET_WINDOW.lock().unwrap() = Some(ctx.window.clone());
+        ctx.window.set_visible(true);
     });
-    rsx! {}
 }
 
-/// Show/hide widget window dari mana saja.
-pub fn set_widget_visible(visible: bool) {
-    if let Some(w) = state::WIDGET_WINDOW.lock().unwrap().as_ref() {
-        w.set_visible(visible);
-        if visible {
-            w.set_focus();
+/// Tampilkan widget (window-nya dibuat lazy saat pertama kali).
+pub fn show_widget() {
+    WIDGET_MENU_ITEM.with(|cell| {
+        if let Some(item) = cell.borrow().as_ref() {
+            item.set_checked(true);
         }
+    });
+    if let Some(w) = state::WIDGET_WINDOW.lock().unwrap().as_ref() {
+        w.set_visible(true);
+        w.set_focus();
+    } else {
+        spawn_widget_creation();
     }
 }
 
-/// Toggle visibilitas widget + sinkronkan centang menu tray.
-/// Hanya dipanggil dari main thread (handler event tray).
-fn toggle_widget() {
-    let visible = match state::WIDGET_WINDOW.lock().unwrap().as_ref() {
-        Some(w) => !w.is_visible(),
-        None => return,
-    };
-    set_widget_visible(visible);
+/// Sembunyikan widget (jika ada) + sinkron centang tray.
+pub fn hide_widget() {
     WIDGET_MENU_ITEM.with(|cell| {
         if let Some(item) = cell.borrow().as_ref() {
-            item.set_checked(visible);
+            item.set_checked(false);
         }
     });
+    if let Some(w) = state::WIDGET_WINDOW.lock().unwrap().as_ref() {
+        w.set_visible(false);
+    }
+}
+
+/// Ganti window yang tampil: main → widget. Invarian: hanya satu window
+/// yang terlihat pada satu waktu.
+pub fn show_widget_only() {
+    dioxus::desktop::window().set_visible(false);
+    show_widget();
+}
+
+/// Ganti window yang tampil: widget → main.
+pub fn show_main_only() {
+    hide_widget();
+    let win = dioxus::desktop::window();
+    win.set_minimized(false);
+    win.set_visible(true);
+    win.set_focus();
+}
+
+/// Toggle widget dari tray/klik kiri ikon.
+fn toggle_widget() {
+    let visible = state::WIDGET_WINDOW
+        .lock()
+        .unwrap()
+        .as_ref()
+        .is_some_and(|w| w.is_visible());
+    if visible {
+        hide_widget();
+    } else {
+        show_widget_only();
+    }
 }

@@ -7,8 +7,8 @@ static SETTINGS: OnceLock<RwLock<Arc<Settings>>> = OnceLock::new();
 /// Perintah UI lintas window (dari dom widget → dom utama).
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum MainCommand {
-    /// Buka window utama pada tampilan Pengaturan.
-    OpenSettings,
+    /// Sembunyikan widget dan tampilkan window utama.
+    ShowMain,
 }
 
 static MAIN_CMD_TX: OnceLock<tokio::sync::mpsc::UnboundedSender<MainCommand>> = OnceLock::new();

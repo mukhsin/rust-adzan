@@ -86,23 +86,19 @@ pub fn WidgetApp() -> Element {
                     }
                     button {
                         class: "{btn}",
-                        title: "Pengaturan",
+                        title: "Tampilkan jadwal lengkap",
                         onmousedown: move |e| e.stop_propagation(),
-                        onclick: move |_| state::send_main_command(state::MainCommand::OpenSettings),
-                        icons::IconSettings { class: "w-3.5 h-3.5" }
+                        onclick: move |_| {
+                            crate::ui::hide_widget();
+                            state::send_main_command(state::MainCommand::ShowMain);
+                        },
+                        icons::IconClock { class: "w-3.5 h-3.5" }
                     }
                     button {
                         class: "p-1.5 rounded-md hover:bg-red-500 hover:text-white dark:hover:bg-red-500 dark:hover:text-white text-zinc-500 dark:text-zinc-400 transition-colors",
                         title: "Tutup widget",
                         onmousedown: move |e| e.stop_propagation(),
-                        onclick: move |_| {
-                            crate::ui::set_widget_visible(false);
-                            crate::state::WIDGET_MENU_ITEM.with(|cell| {
-                                if let Some(item) = cell.borrow().as_ref() {
-                                    item.set_checked(false);
-                                }
-                            });
-                        },
+                        onclick: move |_| crate::ui::hide_widget(),
                         icons::IconClose { class: "w-3.5 h-3.5" }
                     }
                 }
