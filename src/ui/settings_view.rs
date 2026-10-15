@@ -192,6 +192,15 @@ pub fn SettingsView() -> Element {
                             },
                             "Tes"
                         }
+                        button {
+                            class: "{BTN_GHOST}",
+                            title: "Hentikan pemutaran tes/adzan",
+                            onclick: move |_| {
+                                crate::audio::stop_current();
+                                status.set("⏹ pemutaran dihentikan".into());
+                            },
+                            "Stop"
+                        }
                     }
                 }
                 Field { label: "File khusus Subuh", hint: "Opsional; kosong = pakai file adzan umum",
