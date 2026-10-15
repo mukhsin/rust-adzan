@@ -198,6 +198,18 @@ pub fn SettingsView() -> Element {
                             },
                             "Pilih…"
                         }
+                        if draft.read().adzan_file.is_some() {
+                            button {
+                                class: "{BTN_ICON}",
+                                title: "Kembali ke adzan bawaan",
+                                onclick: move |_| {
+                                    let mut s = draft.read().clone();
+                                    s.adzan_file = None;
+                                    apply(s);
+                                },
+                                icons::IconClose { class: "w-3.5 h-3.5" }
+                            }
+                        }
                         button {
                             class: "{BTN_ICON}",
                             title: if *playing_umum.read() {
@@ -233,6 +245,18 @@ pub fn SettingsView() -> Element {
                                 }
                             },
                             "Pilih…"
+                        }
+                        if draft.read().subuh_file.is_some() {
+                            button {
+                                class: "{BTN_ICON}",
+                                title: "Kembali ke adzan Subuh bawaan",
+                                onclick: move |_| {
+                                    let mut s = draft.read().clone();
+                                    s.subuh_file = None;
+                                    apply(s);
+                                },
+                                icons::IconClose { class: "w-3.5 h-3.5" }
+                            }
                         }
                         button {
                             class: "{BTN_ICON}",

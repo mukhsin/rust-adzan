@@ -52,18 +52,18 @@ pub fn resolve_adzan(settings: &crate::settings::Settings) -> Option<PathBuf> {
 }
 
 pub fn resolve_subuh(settings: &crate::settings::Settings) -> Option<PathBuf> {
+    // Hanya sumber khusus Subuh — TIDAK fallback ke file adzan umum
+    // (fallback terakhir Subuh adalah embed DEFAULT_ADZAN_SUBUH).
     if let Some(p) = &settings.subuh_file
         && p.exists()
     {
         return Some(p.clone());
     }
-    let fallback = resolve_adzan(settings);
     ["adzan-subuh.mp3", "adzan_subuh.mp3"]
         .iter()
         .map(|name| candidates(name))
         .flatten()
         .find(|p| p.exists())
-        .or(fallback)
 }
 
 fn candidates(filename: &str) -> Vec<PathBuf> {
