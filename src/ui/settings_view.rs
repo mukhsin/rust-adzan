@@ -272,7 +272,7 @@ pub fn SettingsView() -> Element {
                     }
                 }
                 Field { label: "Pengingat sebelum adzan", hint: "Menit sebelum waktu masuk (0 = nonaktif)",
-                    div { class: "flex items-center gap-1",
+                    div { class: "flex items-center gap-2",
                         button {
                             class: "{BTN_ICON}",
                             title: "Kurangi",
@@ -283,8 +283,8 @@ pub fn SettingsView() -> Element {
                             },
                             icons::IconMinus { class: "w-3.5 h-3.5" }
                         }
-                        span { class: "w-12 text-center text-sm tabular-nums text-zinc-700 dark:text-zinc-300",
-                            "{draft.read().pre_notif_minutes} menit"
+                        span { class: "text-center text-sm tabular-nums text-zinc-700 dark:text-zinc-300",
+                            "{draft.read().pre_notif_minutes}"
                         }
                         button {
                             class: "{BTN_ICON}",
