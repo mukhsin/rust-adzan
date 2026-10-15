@@ -1,7 +1,9 @@
 # Konfigurasi dx CLI (dx serve / dx bundle).
 # Aplikasi desktop-only: jalankan dengan `cargo run` atau `dx serve`.
 [application]
-name = "rust-adzan"
+# Nama ini dipakai dx untuk identitas bundel: nama exe terpasang,
+# folder instalasi default (Programs\Jadwal Sholat), dan nama artefak.
+name = "Jadwal Sholat"
 
 [bundle]
 name = "Jadwal Sholat"

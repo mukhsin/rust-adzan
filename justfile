@@ -33,11 +33,16 @@ css:
 icon:
     cargo run --bin gen-icon
 
-# build installer MSI/NSIS via dx bundle
+# build installer NSIS ringan (WebView2 diunduh saat instalasi)
 bundle:
-    dx bundle --release
-    mv "target/dx/rust-adzan/bundle/windows/nsis/RustAdzan_0.1.0_x64-setup.exe" \
-       "target/dx/rust-adzan/bundle/windows/nsis/Jadwal Sholat 0.1.0 x64-setup.exe"
+    cargo build --release
+    mkdir -p target/nsis
+    MSYS_NO_PATHCONV=1 "$USERPROFILE/.dx/tools/nsis-3.11/Bin/makensis.exe" \
+      /DEXE_SRC="$(cygpath -w "$(pwd)/target/release/rust-adzan.exe")" \
+      /DBOOTSTRAP_SRC="$(cygpath -w "$USERPROFILE/.dx/tools/MicrosoftEdgeWebview2Setup.exe")" \
+      /DICON_SRC="$(cygpath -w "$(pwd)/assets/icon.ico")" \
+      /DOUTDIR="$(cygpath -w "$(pwd)/target/nsis")" \
+      tools/installer.nsi
 
 # jalankan semua unit test (prayer, scheduler, dll)
 test:
