@@ -1,3 +1,7 @@
+// Aplikasi GUI: tanpa jendela console di build release.
+// (Debug tetap pakai console agar println!/eprintln! terlihat saat dev.)
+#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+
 mod audio;
 mod autostart;
 mod cities;
