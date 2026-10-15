@@ -16,11 +16,22 @@ const SELECT: &str = "flex-1 max-w-[210px] bg-zinc-100 dark:bg-zinc-800 border b
 const INPUT: &str = "w-24 bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg px-2 py-1.5 text-sm text-zinc-900 dark:text-zinc-100 text-right outline-none focus:ring-2 ring-zinc-500/50 transition-colors";
 const BTN_GHOST: &str = "px-3 py-1.5 rounded-lg text-xs font-medium border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors";
 const BTN_ICON: &str = "p-1.5 rounded-lg border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors";
+const BTN_CONFIRM: &str = "px-3 py-1.5 rounded-lg text-xs font-medium bg-zinc-900 text-zinc-50 dark:bg-zinc-100 dark:text-zinc-900 hover:opacity-90 transition-opacity";
+const BTN_DANGER: &str = "px-3 py-1.5 rounded-lg text-xs font-medium bg-red-500 text-white hover:bg-red-600 transition-colors";
+
+/// Jenis dialog modal yang sedang tampil.
+#[derive(Debug, Clone, PartialEq)]
+enum Dialog {
+    None,
+    ResetConfirm,
+    AutostartError(String),
+}
 
 #[component]
 pub fn SettingsView() -> Element {
     // Draft lokal; setiap perubahan langsung disimpan + disebarkan.
     let mut draft = use_signal(|| (*state::settings()).clone());
+    let mut dialog = use_signal(|| Dialog::None);
     // Status pemutaran per slot (di-poll berkala agar ikon play/stop akurat).
     let mut playing_umum = use_signal(|| crate::audio::is_playing(crate::audio::Slot::Umum));
     let mut playing_subuh = use_signal(|| crate::audio::is_playing(crate::audio::Slot::Subuh));
@@ -313,11 +324,7 @@ pub fn SettingsView() -> Element {
                                     apply(s);
                                 }
                                 Err(err) => {
-                                    rfd::MessageDialog::new()
-                                        .set_title("Auto-start")
-                                        .set_level(rfd::MessageLevel::Error)
-                                        .set_description(&err)
-                                        .show();
+                                    dialog.set(Dialog::AutostartError(err));
                                 }
                             }
                         },
@@ -328,23 +335,80 @@ pub fn SettingsView() -> Element {
             div { class: "flex justify-center pt-1 pb-2",
                 button {
                     class: "px-3 py-1.5 rounded-lg text-xs font-medium border border-red-300 dark:border-red-900/60 text-red-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors",
-                    onclick: move |_| {
-                        let confirm = rfd::MessageDialog::new()
-                            .set_title("Reset semua pengaturan")
-                            .set_level(rfd::MessageLevel::Warning)
-                            .set_description(
-                                "Kembalikan SEMUA pengaturan ke bawaan (lokasi, audio, notifikasi, tema, auto-start)?",
-                            )
-                            .set_buttons(rfd::MessageButtons::YesNo)
-                            .show();
-                        if confirm == rfd::MessageDialogResult::Yes {
+                    onclick: move |_| dialog.set(Dialog::ResetConfirm),
+                    "Reset semua pengaturan"
+                }
+            }
+
+            {match dialog.read().clone() {
+                Dialog::None => rsx! {},
+                Dialog::ResetConfirm => rsx! {
+                    Modal {
+                        title: "Reset semua pengaturan",
+                        message: "Kembalikan SEMUA pengaturan ke bawaan? (lokasi, audio, notifikasi, tema, auto-start)",
+                        confirm_text: "Ya, reset",
+                        danger: true,
+                        show_cancel: true,
+                        on_confirm: move |_| {
                             let _ = autostart::set_enabled(false);
                             let s = Settings::default();
                             state::update_settings(s.clone());
                             draft.set(s);
+                            dialog.set(Dialog::None);
+                        },
+                        on_cancel: move |_| dialog.set(Dialog::None),
+                    }
+                },
+                Dialog::AutostartError(err) => rsx! {
+                    Modal {
+                        title: "Auto-start",
+                        message: err.clone(),
+                        confirm_text: "OK",
+                        danger: false,
+                        show_cancel: false,
+                        on_confirm: move |_| dialog.set(Dialog::None),
+                        on_cancel: move |_| dialog.set(Dialog::None),
+                    }
+                },
+            }}
+        }
+    }
+}
+
+/// Modal dialog bertema aplikasi (pengganti dialog OS yang jelek di tema gelap).
+/// Klik backdrop atau tombol batal = tutup tanpa aksi.
+#[component]
+fn Modal(
+    title: String,
+    message: String,
+    confirm_text: String,
+    danger: bool,
+    show_cancel: bool,
+    on_confirm: EventHandler<()>,
+    on_cancel: EventHandler<()>,
+) -> Element {
+    rsx! {
+        div {
+            class: "fixed inset-0 z-50 flex items-center justify-center bg-black/60",
+            onclick: move |_| on_cancel.call(()),
+            div {
+                class: "w-80 bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-5 shadow-2xl flex flex-col gap-2",
+                onclick: move |e| e.stop_propagation(),
+                h2 { class: "text-sm font-semibold text-zinc-900 dark:text-zinc-50", "{title}" }
+                p { class: "text-xs text-zinc-500 dark:text-zinc-400 leading-relaxed", "{message}" }
+                div { class: "flex justify-end gap-2 mt-3",
+                    if show_cancel {
+                        button {
+                            class: "{BTN_GHOST}",
+                            onclick: move |_| on_cancel.call(()),
+                            "Batal"
                         }
-                    },
-                    "Reset semua pengaturan"
+                    }
+                    button {
+                        class: if danger { "{BTN_DANGER}" } else { "{BTN_CONFIRM}" },
+                        onclick: move |_| on_confirm.call(()),
+                        "{confirm_text}"
+                    }
                 }
             }
         }
