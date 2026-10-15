@@ -79,14 +79,19 @@ dihentikan lewat tombol Stop.
 
 Ikon diambil dari `assets/mosque.png`, dipakai apa adanya (transparan).
 Setelah mengganti PNG, jalankan `just icon` untuk men-generate
-`assets/icon.rgba` + `assets/icon-tray.rgba` yang di-embed ke binary.
+`assets/icon.rgba`, `assets/icon-tray.rgba`, dan `assets/icon.ico`
+(yang terakhir di-embed ke exe untuk ikon di Explorer + metadata file).
 
 ## Build rilis
 
 ```bash
-cargo build --release   # binary di target/release/rust-adzan.exe
+cargo build --release   # binary portable di target/release/rust-adzan.exe
 dx bundle               # installer MSI (opsional)
 ```
+
+Binary release **portable** — adzan bawaan, ikon, dan aset lain sudah
+ter-embed; satu-satunya dependensi adalah WebView2 (bawaan Windows 10/11).
+Log aplikasi: `%APPDATA%\jadwal-sholat\app.log`.
 
 ## Struktur
 

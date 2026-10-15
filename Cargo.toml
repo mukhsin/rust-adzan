@@ -22,3 +22,6 @@ winreg = "0.56.0"
 [profile.release]
 opt-level = "s"
 lto = true
+
+[build-dependencies]
+winresource = "0.1.34"

@@ -4,4 +4,6 @@
 name = "rust-adzan"
 
 [bundle]
-identifier = "id.mukhsin.rust-adzan"
+identifier = "id.mukhsin.jadwalsholat"
+publisher = "Jadwal Sholat"
+icon = ["assets/icon.ico"]
