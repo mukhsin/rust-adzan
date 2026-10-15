@@ -33,9 +33,11 @@ css:
 icon:
     cargo run --bin gen-icon
 
-# build installer MSI via dx bundle
+# build installer MSI/NSIS via dx bundle
 bundle:
-    dx bundle
+    dx bundle --release
+    mv "target/dx/rust-adzan/bundle/windows/nsis/RustAdzan_0.1.0_x64-setup.exe" \
+       "target/dx/rust-adzan/bundle/windows/nsis/Jadwal Sholat 0.1.0 x64-setup.exe"
 
 # jalankan semua unit test (prayer, scheduler, dll)
 test:

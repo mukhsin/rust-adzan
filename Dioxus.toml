@@ -4,6 +4,12 @@
 name = "rust-adzan"
 
 [bundle]
+name = "Jadwal Sholat"
 identifier = "id.mukhsin.jadwalsholat"
 publisher = "Jadwal Sholat"
 icon = ["assets/icon.ico"]
+
+[bundle.windows]
+# Installer ringan: WebView2 diunduh dari Microsoft saat instalasi
+# (alternatif "OfflineInstaller" = ±195 MB tapi tanpa internet).
+webview_install_mode = { DownloadBootstrapper = { silent = true } }
