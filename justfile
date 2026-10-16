@@ -86,3 +86,19 @@ prune:
         echo "Tidak ada installer di target/nsis, lewati arsip."; \
     fi
     cargo clean
+
+# rilis lengkap: bump versi, commit+push, installer, GitHub release, arsip ke dist/
+# contoh: just release-all 0.2.0   (opsional: notes=path file catatan rilis)
+release-all version notes="":
+    @echo '{{version}}' | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$' || (echo "Versi harus format x.y.z (contoh: 0.2.0)"; exit 1)
+    @test -z "$(git status --porcelain)" || (echo "Working tree tidak bersih — commit dulu perubahanmu."; exit 1)
+    @sed -i 's/^version = ".*"/version = "{{version}}"/' Cargo.toml
+    @sed -i 's/!define VERSION ".*"/!define VERSION "{{version}}"/' tools/installer.nsi
+    @cargo build --release
+    @git add Cargo.toml Cargo.lock tools/installer.nsi
+    @git commit -m "release: v{{version}}"
+    @git push
+    @just bundle
+    @mkdir -p dist
+    @cp -v "target/nsis/Jadwal Sholat {{version}} x64-setup.exe" dist/
+    @bash tools/release.sh {{version}} {{notes}}

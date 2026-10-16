@@ -56,14 +56,16 @@ Development bisa dipermudah dengan [just](https://github.com/casey/just)
 (`winget install Casey.Just`). Jalankan `just` untuk melihat semua perintah:
 
 ```bash
-just dev      # hot-reload via dx serve
-just run      # cargo run sekali
-just test     # unit test
-just fmt      # format kode
-just clippy   # linter
-just verify   # fmt-check + clippy + test
-just release  # build rilis
-just bundle   # installer MSI
+just dev          # hot-reload via dx serve
+just run          # cargo run sekali
+just test         # unit test
+just fmt          # format kode
+just clippy       # linter
+just verify       # fmt-check + clippy + test
+just release      # build rilis
+just bundle       # installer NSIS ringan
+just prune        # arsipkan installer ke dist/ + bersihkan target/
+just release-all  # bump versi + build + GitHub release (lihat bawah)
 ```
 
 ### Audio adzan
@@ -86,12 +88,27 @@ Setelah mengganti PNG, jalankan `just icon` untuk men-generate
 
 ```bash
 cargo build --release   # binary portable di target/release/rust-adzan.exe
-dx bundle               # installer MSI (opsional)
+just bundle             # installer NSIS ringan di target/nsis/ (WebView2 diunduh saat instalasi)
+just prune              # arsipkan installer ke dist/ lalu bersihkan target/
 ```
 
 Binary release **portable** — adzan bawaan, ikon, dan aset lain sudah
 ter-embed; satu-satunya dependensi adalah WebView2 (bawaan Windows 10/11).
 Log aplikasi: `%APPDATA%\jadwal-sholat\app.log`.
+
+### Rilis ke GitHub
+
+```bash
+just release-all 0.2.0
+```
+
+Satu perintah untuk rilis lengkap: naikkan versi di `Cargo.toml` +
+`tools/installer.nsi`, commit + push (pesan `release: vX.Y.Z`), build
+installer, arsip ke `dist/`, lalu buat release `vX.Y.Z` di GitHub dengan
+installer sebagai aset unduhan — via `tools/release.sh`, memakai kredensial
+git yang tersimpan (tanpa gh CLI). Syarat: working tree bersih, format
+versi `x.y.z`, dan versi tersebut belum pernah dirilis. Untuk catatan
+rilis kustom: `just release-all 0.2.0 notes=catatan.md`.
 
 ## Struktur
 
