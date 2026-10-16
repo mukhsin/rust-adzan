@@ -75,3 +75,14 @@ doc:
 # bersihkan hasil build
 clean:
     cargo clean
+
+# arsipkan installer ke dist/ lalu bersihkan seluruh target/ (hemat disk)
+prune:
+    mkdir -p dist
+    if ls target/nsis/*.exe >/dev/null 2>&1; then \
+        cp -v target/nsis/*.exe dist/; \
+        echo "Installer diarsipkan ke dist/"; \
+    else \
+        echo "Tidak ada installer di target/nsis, lewati arsip."; \
+    fi
+    cargo clean
