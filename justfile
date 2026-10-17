@@ -96,7 +96,7 @@ release-all version notes="":
     @sed -i 's/!define VERSION ".*"/!define VERSION "{{version}}"/' tools/installer.nsi
     @cargo build --release
     @git add Cargo.toml Cargo.lock tools/installer.nsi
-    @git commit -m "release: v{{version}}"
+    @git diff --cached --quiet || git commit -m "release: v{{version}}"
     @git push
     @just bundle
     @mkdir -p dist
