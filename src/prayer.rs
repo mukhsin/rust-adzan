@@ -1,6 +1,10 @@
 use crate::settings::{CalcMethod, MadhabChoice, Settings};
 use chrono::{DateTime, Duration, NaiveDate, NaiveTime};
 use salah::prelude::*;
+use std::sync::OnceLock;
+
+/// Offset jam palsu (dari env JADWAL_FAKE_TIME) — dihitung sekali.
+static FAKE_OFFSET: OnceLock<Option<Duration>> = OnceLock::new();
 
 /// Lima sholat wajib yang memicu adzan (urutan hari).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
@@ -123,10 +127,16 @@ pub fn next_prayer(times: &DayTimes, now: NaiveTime) -> (PrayerKind, NaiveTime) 
     (PrayerKind::Subuh, times.subuh_esok)
 }
 
-/// Selisih `target - now` sebagai Duration (bisa negatif kalau sudah lewat).
+/// Selisih `target - now` sebagai Duration untuk COUNTDOWN.
+/// Kalau target < now, target dianggap jatuh esok hari (lintas tengah
+/// malam) dan ditambah 24 jam — sehingga countdown ke Subuh esok setelah
+/// Isya selalu positif, bukan mentok 00:00:00.
 pub fn time_until(now: NaiveTime, target: NaiveTime) -> Duration {
     let now_secs = now.num_seconds_from_midnight() as i64;
-    let target_secs = target.num_seconds_from_midnight() as i64;
+    let mut target_secs = target.num_seconds_from_midnight() as i64;
+    if target_secs < now_secs {
+        target_secs += 86_400;
+    }
     Duration::seconds(target_secs - now_secs)
 }
 
@@ -145,8 +155,34 @@ pub fn format_time(t: NaiveTime) -> String {
     t.format("%H:%M").to_string()
 }
 
+/// Waktu "sekarang" dalam zona waktu kota.
+///
+/// Untuk testing: set env `JADWAL_FAKE_TIME=HH:MM[:SS]` saat menjalankan app
+/// agar jam internal digeser ke waktu tersebut (tetap berjalan/berdetak).
+/// Offset dihitung sekali saat pemanggilan pertama. Tanpa env var = jam asli.
 pub fn now_in_tz(settings: &Settings) -> DateTime<chrono_tz::Tz> {
-    chrono::Utc::now().with_timezone(&settings.timezone())
+    let real = chrono::Utc::now().with_timezone(&settings.timezone());
+    let offset = *FAKE_OFFSET.get_or_init(|| {
+        std::env::var("JADWAL_FAKE_TIME")
+            .ok()
+            .and_then(|raw| {
+                let fake = NaiveTime::parse_from_str(&raw, "%H:%M:%S")
+                    .or_else(|_| NaiveTime::parse_from_str(&raw, "%H:%M"))
+                    .ok()?;
+                let fake_dt = real
+                    .timezone()
+                    .from_local_datetime(&real.date_naive().and_time(fake))
+                    .single()?;
+                Some(fake_dt - real)
+            })
+            .inspect(|o| {
+                crate::logger::info(&format!("JADWAL_FAKE_TIME aktif — jam digeser {o}"));
+            })
+    });
+    match offset {
+        Some(o) => real + o,
+        None => real,
+    }
 }
 
 #[cfg(test)]
@@ -252,5 +288,23 @@ mod tests {
     fn countdown_format() {
         assert_eq!(format_countdown(Duration::seconds(3661)), "01:01:01");
         assert_eq!(format_countdown(Duration::seconds(-5)), "00:00:00");
+    }
+
+    #[test]
+    fn countdown_lintas_tengah_malam_positif() {
+        // Regresi: setelah Isya, countdown ke Subuh esok mentok 00:00:00
+        // karena selisih detik-dalam-sehari negatif tanpa koreksi +24 jam.
+        let hm = |h: u32, m: u32| NaiveTime::from_hms_opt(h, m, 0).unwrap();
+
+        // 23:30 -> 04:14 esok = 4 jam 44 menit.
+        let d = time_until(hm(23, 30), hm(4, 14));
+        assert_eq!(d, Duration::seconds(17_040));
+        assert_eq!(format_countdown(d), "04:44:00");
+
+        // Countdown sama-hari tetap benar.
+        assert_eq!(time_until(hm(10, 0), hm(11, 58)), Duration::seconds(7_080));
+
+        // Tepat pada waktunya = nol.
+        assert_eq!(time_until(hm(17, 50), hm(17, 50)), Duration::zero());
     }
 }

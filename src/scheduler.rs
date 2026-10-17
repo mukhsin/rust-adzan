@@ -51,7 +51,12 @@ pub fn tick(state: &mut EngineState, settings: &Settings, now: DateTime<Tz>) -> 
 
     for kind in ADZAN_PRAYERS {
         let target = times.waktu(kind);
-        let elapsed = crate::prayer::time_until(target, now_t);
+        // Elapsed mentah (bisa negatif sebelum waktu masuk) — sengaja TIDAK
+        // memakai prayer::time_until yang mengoreksi lintas tengah malam,
+        // karena window trigger 2 detik butuh nilai hari-yang-sama.
+        let elapsed = Duration::seconds(
+            now_t.num_seconds_from_midnight() as i64 - target.num_seconds_from_midnight() as i64,
+        );
 
         // Trigger adzan: baru saja masuk waktu (0..=2s) dan belum diputar.
         if !state.played.contains(&kind) && elapsed >= Duration::zero() && elapsed <= tolerance {
