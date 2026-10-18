@@ -282,14 +282,16 @@ pub fn SettingsView() -> Element {
                         },
                     }
                 }
-                Field { label: "Pengingat sebelum adzan", hint: "Menit sebelum waktu masuk (0 = nonaktif)",
+                Field { label: "Pengingat sebelum adzan", hint: "Menit sebelum waktu masuk",
                     div { class: "flex items-center gap-2",
                         button {
                             class: "{BTN_ICON}",
                             title: "Kurangi",
                             onclick: move |_| {
                                 let mut s = draft.read().clone();
-                                s.pre_notif_minutes = s.pre_notif_minutes.saturating_sub(1);
+                                if s.pre_notif_minutes > 1 {
+                                    s.pre_notif_minutes -= 1;
+                                }
                                 apply(s);
                             },
                             icons::IconMinus { class: "w-3.5 h-3.5" }

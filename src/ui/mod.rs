@@ -3,7 +3,6 @@ pub mod schedule;
 pub mod settings_view;
 pub mod widget;
 
-use crate::settings::Theme;
 use crate::state;
 use dioxus::desktop::trayicon::menu::{CheckMenuItem, Menu, MenuItem, PredefinedMenuItem};
 use dioxus::desktop::trayicon::{init_tray_icon, use_tray_icon};
@@ -81,70 +80,29 @@ pub fn app() -> Element {
         style { {TAILWIND_CSS} }
         TraySetup {}
         div { class: "{root_class}",
-            TitleBar { title: "Pengaturan", theme }
+            TitleBar { title: "Pengaturan" }
             settings_view::SettingsView {}
         }
     }
 }
 
-/// Title bar custom (window frameless): logo + judul, toggle tema,
-/// minimize, maximize, close. Seluruh bar bisa dipakai drag window.
-/// Window utama kini khusus pengaturan — jadwal lengkap ada di widget.
+/// Title bar minimal window pengaturan: judul + tombol tutup saja.
+/// Seluruh bar bisa dipakai drag window.
 #[component]
-pub fn TitleBar(title: &'static str, theme: Signal<Theme>) -> Element {
-    let btn = "p-1.5 rounded-md hover:bg-zinc-200 dark:hover:bg-zinc-800 text-zinc-500 dark:text-zinc-400 transition-colors";
-    let dark = theme.read().is_dark();
-
+pub fn TitleBar(title: &'static str) -> Element {
     rsx! {
         div {
             class: "h-10 shrink-0 flex items-center justify-between px-3 select-none cursor-default bg-zinc-50 dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800 transition-colors duration-300",
             onmousedown: move |_| { dioxus::desktop::window().drag(); },
 
-            div { class: "flex items-center gap-2",
-                icons::Mosque { class: "w-4 h-4 text-zinc-600 dark:text-zinc-300" }
-                span { class: "text-xs font-medium text-zinc-600 dark:text-zinc-300", "{title}" }
-            }
+            span { class: "text-xs font-medium text-zinc-600 dark:text-zinc-300", "{title}" }
 
-            div { class: "flex items-center gap-1",
-                button {
-                    class: "{btn}",
-                    title: "Ganti tema",
-                    onmousedown: move |e| e.stop_propagation(),
-                    onclick: move |_| {
-                        let next = if dark { Theme::Light } else { Theme::Dark };
-                        let mut s = (*state::settings()).clone();
-                        s.theme = next;
-                        state::update_settings(s);
-                        theme.set(next);
-                    },
-                    if dark {
-                        icons::IconSun { class: "w-3.5 h-3.5" }
-                    } else {
-                        icons::IconMoon { class: "w-3.5 h-3.5" }
-                    }
-                }
-                div { class: "w-px h-4 bg-zinc-300 dark:bg-zinc-700 mx-1" }
-                button {
-                    class: "{btn}",
-                    title: "Minimize",
-                    onmousedown: move |e| e.stop_propagation(),
-                    onclick: move |_| dioxus::desktop::window().set_minimized(true),
-                    icons::IconMinus { class: "w-3.5 h-3.5" }
-                }
-                button {
-                    class: "{btn}",
-                    title: "Maximize",
-                    onmousedown: move |e| e.stop_propagation(),
-                    onclick: move |_| dioxus::desktop::window().toggle_maximized(),
-                    icons::IconSquare { class: "w-3 h-3" }
-                }
-                button {
-                    class: "p-1.5 rounded-md hover:bg-red-500 hover:text-white dark:hover:bg-red-500 dark:hover:text-white text-zinc-500 dark:text-zinc-400 transition-colors",
-                    title: "Tutup (tetap berjalan di tray)",
-                    onmousedown: move |e| e.stop_propagation(),
-                    onclick: move |_| dioxus::desktop::window().set_visible(false),
-                    icons::IconClose { class: "w-3.5 h-3.5" }
-                }
+            button {
+                class: "p-1.5 rounded-md hover:bg-red-500 hover:text-white dark:hover:bg-red-500 dark:hover:text-white text-zinc-500 dark:text-zinc-400 transition-colors",
+                title: "Tutup (tetap berjalan di tray)",
+                onmousedown: move |e| e.stop_propagation(),
+                onclick: move |_| dioxus::desktop::window().set_visible(false),
+                icons::IconClose { class: "w-3.5 h-3.5" }
             }
         }
     }

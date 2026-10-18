@@ -61,7 +61,8 @@ pub struct Settings {
     pub volume: f32,
 
     pub notif_enabled: bool,
-    /// Berapa menit sebelum adzan dikirim notifikasi pengingat.
+    /// Berapa menit sebelum adzan dikirim notifikasi pengingat (minimal 1;
+    /// matikan pengingat lewat `notif_enabled`).
     pub pre_notif_minutes: u32,
 
     pub autostart: bool,
@@ -122,10 +123,18 @@ pub fn config_path() -> PathBuf {
 pub fn load() -> Settings {
     let path = config_path();
     match std::fs::read_to_string(&path) {
-        Ok(text) => serde_json::from_str(&text).unwrap_or_else(|e| {
-            crate::logger::error(&format!("gagal membaca config ({e}); memakai default"));
-            Settings::default()
-        }),
+        Ok(text) => {
+            let mut s: Settings = serde_json::from_str(&text).unwrap_or_else(|e| {
+                crate::logger::error(&format!("gagal membaca config ({e}); memakai default"));
+                Settings::default()
+            });
+            // Config lama bisa menyimpan 0 (= nonaktif pada model lama).
+            // Kini nonaktif itu lewat `notif_enabled`; menit minimal 1.
+            if s.pre_notif_minutes == 0 {
+                s.pre_notif_minutes = 1;
+            }
+            s
+        }
         Err(_) => Settings::default(),
     }
 }
