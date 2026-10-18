@@ -21,18 +21,24 @@ AUTH="Authorization: Bearer $TOKEN"
 CODE=$(curl -s -o /dev/null -w "%{http_code}" -H "$AUTH" "$API/releases/tags/$TAG")
 [ "$CODE" = "404" ] || { echo "Release $TAG sudah ada (HTTP $CODE) — naikkan versi dulu."; exit 1; }
 
-# Susun body JSON; catatan dari file opsional di-escape (backslash, kutip, newline).
+# Susun body JSON; catatan dari file opsional di-escape (backslash, kutip,
+# newline). JSON dibangun via printf ke file lalu dikirim `-d @file` — kalau
+# diinterpolasi langsung ke arg curl, backslash escape-nya dimakan shell.
 if [ "${2:-}" != "" ] && [ -f "$2" ]; then
-  BODY=$(sed -e 's/\\/\\\\/g' -e 's/"/\\"/g' "$2" | sed -e ':a' -e 'N' -e '$!ba' -e 's/\n/\\n/g')
+  BODY=$(sed -e 's/\\/\\\\/g' -e 's/"/\\"/g' -e 's/\t/\\t/g' "$2" | sed -e ':a' -e 'N' -e '$!ba' -e 's/\n/\\n/g')
 else
   BODY="Rilis Jadwal Sholat $VERSION — aplikasi desktop jadwal sholat + adzan otomatis untuk Windows, 100% offline.\\n\\nUnduh **Jadwal Sholat $VERSION x64-setup.exe**, jalankan, selesai — WebView2 diunduh otomatis saat instalasi bila belum ada.\\n\\nButuh: Windows 10/11 64-bit."
 fi
 
 echo "Membuat release $TAG ..."
 RESP=$(mktemp)
+REQ=$(mktemp)
+trap 'rm -f "$RESP" "$REQ"' EXIT
+printf '{"tag_name":"%s","target_commitish":"main","name":"Jadwal Sholat %s","draft":false,"prerelease":false,"body":"%s"}' \
+  "$TAG" "$TAG" "$BODY" > "$REQ"
 HTTP=$(curl -s -o "$RESP" -w "%{http_code}" -X POST -H "$AUTH" -H "Accept: application/vnd.github+json" \
   "$API/releases" \
-  -d "{\"tag_name\":\"$TAG\",\"target_commitish\":\"main\",\"name\":\"Jadwal Sholat $TAG\",\"draft\":false,\"prerelease\":false,\"body\":\"$BODY\"}")
+  -d @"$REQ")
 [ "$HTTP" = "201" ] || { echo "Gagal membuat release (HTTP $HTTP):"; head -c 600 "$RESP"; echo; exit 1; }
 
 UPLOAD_URL=$(sed -n 's/.*"upload_url": *"\([^"]*\)".*/\1/p' "$RESP" | sed 's/{.*//')
@@ -47,4 +53,3 @@ HTTP=$(curl -s -o "$UP" -w "%{http_code}" -X POST -H "$AUTH" -H "Content-Type: a
 echo "Release selesai:"
 sed -n 's/.*"html_url": *"\([^"]*\)".*/  halaman : \1/p' "$RESP" | head -1
 sed -n 's/.*"browser_download_url": *"\([^"]*\)".*/  download: \1/p' "$UP"
-rm -f "$RESP" "$UP"
