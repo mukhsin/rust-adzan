@@ -1,5 +1,5 @@
 use super::icons;
-use super::main_view::{BULAN, HARI, Header};
+use super::schedule::{BULAN, HARI, Header, PrayerList};
 use crate::prayer;
 use crate::settings::Theme;
 use crate::state;
@@ -8,7 +8,10 @@ use dioxus::prelude::*;
 
 /// Root komponen widget window — dom terpisah dari window utama,
 /// state dibaca dari global `state::settings()` setiap tick.
-/// Title bar & konten sama seperti main window, tanpa daftar jadwal.
+/// Dua ukuran: kecil (hanya header) dan besar (header + daftar jadwal).
+/// Drag memakai mekanisme native (`window.drag()`, smooth seperti main
+/// window); saat drag selesai posisi di-snap ke margin oleh
+/// `crate::ui::clamp_widget_position`.
 #[allow(non_snake_case)]
 pub fn WidgetApp() -> Element {
     let mut tick = use_signal(|| 0u64);
@@ -19,6 +22,10 @@ pub fn WidgetApp() -> Element {
         }
     });
     let mut theme = use_signal(|| state::settings().theme);
+    let mut expanded = use_signal(|| false);
+    // Handle window per-closure (Rc, murah untuk di-clone).
+    let win_drag = dioxus::desktop::window();
+    let win_expand = win_drag.clone();
 
     let _ = tick();
     // Sinkronkan tema dari dom lain (mis. toggle di main window).
@@ -42,7 +49,7 @@ pub fn WidgetApp() -> Element {
     );
 
     let mut root_class = String::from(
-        "h-screen w-screen flex flex-col overflow-hidden font-sans \
+        "h-screen w-screen flex flex-col overflow-hidden select-none font-sans \
          bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-50 \
          border border-zinc-200 dark:border-zinc-800 transition-colors duration-300",
     );
@@ -51,15 +58,29 @@ pub fn WidgetApp() -> Element {
     }
 
     let btn = "p-1.5 rounded-md hover:bg-zinc-200 dark:hover:bg-zinc-800 text-zinc-500 dark:text-zinc-400 transition-colors";
+    let is_expanded = *expanded.read();
     let dark = theme.read().is_dark();
+    let content_class = if is_expanded {
+        "flex-1 p-5 overflow-y-auto flex flex-col gap-6"
+    } else {
+        "flex-1 p-5 overflow-hidden"
+    };
 
     rsx! {
         style { {crate::ui::TAILWIND_CSS} }
-        div { class: "{root_class}",
-            // Title bar: sama seperti main window, tombol tema/pengaturan/tutup.
+        div {
+            class: "{root_class}",
+            // Title bar: drag area, tombol tema, pengaturan & perbesar/perkecil.
             div {
                 class: "h-10 shrink-0 flex items-center justify-between px-3 select-none cursor-default bg-zinc-50 dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800 transition-colors duration-300",
-                onmousedown: move |_| { dioxus::desktop::window().drag(); },
+                onmousedown: move |_| {
+                    // Drag native — modal loop OS, kembali saat mouse dilepas.
+                    win_drag.drag();
+                    // drag() di Windows async: clamp di sini jalan saat
+                    // mousedown, bukan saat drag selesai. Karena itu snap
+                    // ditangguhkan ke watcher yang memantau tombol mouse.
+                    crate::ui::watch_widget_drag_release();
+                },
 
                 div { class: "flex items-center gap-2",
                     icons::Mosque { class: "w-4 h-4 text-zinc-600 dark:text-zinc-300" }
@@ -86,28 +107,39 @@ pub fn WidgetApp() -> Element {
                     }
                     button {
                         class: "{btn}",
-                        title: "Tampilkan jadwal lengkap",
+                        title: "Buka Pengaturan",
                         onmousedown: move |e| e.stop_propagation(),
                         onclick: move |_| {
-                            crate::ui::hide_widget();
+                            // Widget tetap tampil — main window boleh bersamaan.
                             state::send_main_command(state::MainCommand::ShowMain);
                         },
-                        icons::IconClock { class: "w-3.5 h-3.5" }
+                        icons::IconSettings { class: "w-3.5 h-3.5" }
                     }
                     button {
-                        class: "p-1.5 rounded-md hover:bg-red-500 hover:text-white dark:hover:bg-red-500 dark:hover:text-white text-zinc-500 dark:text-zinc-400 transition-colors",
-                        title: "Tutup widget",
+                        class: "{btn}",
+                        title: if is_expanded { "Perkecil widget" } else { "Tampilkan jadwal lengkap" },
                         onmousedown: move |e| e.stop_propagation(),
-                        onclick: move |_| crate::ui::hide_widget(),
-                        icons::IconClose { class: "w-3.5 h-3.5" }
+                        onclick: move |_| {
+                            let next = !*expanded.read();
+                            expanded.set(next);
+                            crate::ui::apply_widget_size(&win_expand, next);
+                        },
+                        if is_expanded {
+                            icons::IconMinimize2 { class: "w-3.5 h-3.5" }
+                        } else {
+                            icons::IconMaximize2 { class: "w-3.5 h-3.5" }
+                        }
                     }
                 }
             }
 
             {match times {
                 Some(times) => rsx! {
-                    div { class: "flex-1 p-5 overflow-hidden",
+                    div { class: "{content_class}",
                         Header { lokasi: lokasi.clone(), tanggal: tanggal.clone(), times: times, now: now.time() }
+                        if is_expanded {
+                            PrayerList { times: times, now: now.time() }
+                        }
                     }
                 },
                 None => rsx! {

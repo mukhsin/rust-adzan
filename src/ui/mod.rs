@@ -1,5 +1,5 @@
 pub mod icons;
-pub mod main_view;
+pub mod schedule;
 pub mod settings_view;
 pub mod widget;
 
@@ -11,8 +11,9 @@ use dioxus::desktop::use_muda_event_handler;
 use dioxus::desktop::use_tray_icon_event_handler;
 use dioxus::desktop::{
     Config, WindowBuilder,
-    tao::dpi::{LogicalPosition, LogicalSize},
+    tao::dpi::{LogicalSize, PhysicalPosition},
     tao::platform::windows::WindowBuilderExtWindows,
+    tao::window::Window,
 };
 use dioxus::prelude::*;
 use state::WIDGET_MENU_ITEM;
@@ -24,15 +25,15 @@ pub static WINDOW_ICON_RGBA: &[u8] = include_bytes!("../../assets/icon.rgba");
 /// Data piksel RGBA (32×32) untuk tray icon.
 pub static TRAY_ICON_RGBA: &[u8] = include_bytes!("../../assets/icon-tray.rgba");
 
-/// Tampilan yang sedang aktif di window utama.
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub enum View {
-    Main,
-    Settings,
-}
+/// Margin widget dari tepi monitor (px logical) — dipakai saat posisi default,
+/// clamp saat drag, dan setelah ganti ukuran.
+pub(crate) const WIDGET_MARGIN: f64 = 16.0;
+/// Ukuran widget (px logical): kecil (hanya header) dan besar (header + daftar
+/// jadwal). Lebar keduanya sama — mode besar hanya bertambah tinggi.
+pub(crate) const WIDGET_SIZE_SMALL: (f64, f64) = (300.0, 280.0);
+pub(crate) const WIDGET_SIZE_LARGE: (f64, f64) = (300.0, 500.0);
 
 pub fn app() -> Element {
-    let mut view = use_signal(|| View::Main);
     let mut theme = use_signal(|| state::settings().theme);
 
     // Sinkronkan tema dari dom lain (mis. toggle di widget window) tiap detik.
@@ -48,7 +49,9 @@ pub fn app() -> Element {
         theme.set(state::settings().theme);
     }
 
-    // Perintah lintas window: tombol jam di widget menampilkan main window.
+    // Perintah lintas window: tombol pengaturan di widget menampilkan window
+    // utama. `dioxus::desktop::window()` di dom widget menunjuk widget, jadi
+    // jalannya lewat channel ini (handler di dom utama).
     use_future(move || async move {
         loop {
             tokio::time::sleep(std::time::Duration::from_millis(100)).await;
@@ -74,44 +77,21 @@ pub fn app() -> Element {
         root_class.push_str(" dark");
     }
 
-    let title: &'static str = if *view.read() == View::Main {
-        "Jadwal Sholat"
-    } else {
-        "Pengaturan"
-    };
-
     rsx! {
         style { {TAILWIND_CSS} }
         TraySetup {}
         div { class: "{root_class}",
-            TitleBar {
-                title,
-                show_back: *view.read() == View::Settings,
-                on_back: move |_| view.set(View::Main),
-                show_settings: *view.read() == View::Main,
-                on_settings: move |_| view.set(View::Settings),
-                theme,
-            }
-            if *view.read() == View::Main {
-                main_view::MainView {}
-            } else {
-                settings_view::SettingsView {}
-            }
+            TitleBar { title: "Pengaturan", theme }
+            settings_view::SettingsView {}
         }
     }
 }
 
-/// Title bar custom (window frameless): logo + judul, toggle tema, tombol settings,
+/// Title bar custom (window frameless): logo + judul, toggle tema,
 /// minimize, maximize, close. Seluruh bar bisa dipakai drag window.
+/// Window utama kini khusus pengaturan — jadwal lengkap ada di widget.
 #[component]
-pub fn TitleBar(
-    title: &'static str,
-    show_back: bool,
-    on_back: EventHandler<()>,
-    show_settings: bool,
-    on_settings: EventHandler<()>,
-    theme: Signal<Theme>,
-) -> Element {
+pub fn TitleBar(title: &'static str, theme: Signal<Theme>) -> Element {
     let btn = "p-1.5 rounded-md hover:bg-zinc-200 dark:hover:bg-zinc-800 text-zinc-500 dark:text-zinc-400 transition-colors";
     let dark = theme.read().is_dark();
 
@@ -121,17 +101,7 @@ pub fn TitleBar(
             onmousedown: move |_| { dioxus::desktop::window().drag(); },
 
             div { class: "flex items-center gap-2",
-                if show_back {
-                    button {
-                        class: "{btn}",
-                        title: "Kembali",
-                        onmousedown: move |e| e.stop_propagation(),
-                        onclick: move |_| on_back.call(()),
-                        icons::IconBack { class: "w-3.5 h-3.5" }
-                    }
-                } else {
-                    icons::Mosque { class: "w-4 h-4 text-zinc-600 dark:text-zinc-300" }
-                }
+                icons::Mosque { class: "w-4 h-4 text-zinc-600 dark:text-zinc-300" }
                 span { class: "text-xs font-medium text-zinc-600 dark:text-zinc-300", "{title}" }
             }
 
@@ -153,15 +123,6 @@ pub fn TitleBar(
                         icons::IconMoon { class: "w-3.5 h-3.5" }
                     }
                 }
-                if show_settings {
-                    button {
-                        class: "{btn}",
-                        title: "Pengaturan",
-                        onmousedown: move |e| e.stop_propagation(),
-                        onclick: move |_| on_settings.call(()),
-                        icons::IconSettings { class: "w-3.5 h-3.5" }
-                    }
-                }
                 div { class: "w-px h-4 bg-zinc-300 dark:bg-zinc-700 mx-1" }
                 button {
                     class: "{btn}",
@@ -179,9 +140,9 @@ pub fn TitleBar(
                 }
                 button {
                     class: "p-1.5 rounded-md hover:bg-red-500 hover:text-white dark:hover:bg-red-500 dark:hover:text-white text-zinc-500 dark:text-zinc-400 transition-colors",
-                    title: "Tutup (lanjut di widget)",
+                    title: "Tutup (tetap berjalan di tray)",
                     onmousedown: move |e| e.stop_propagation(),
-                    onclick: move |_| show_widget_only(),
+                    onclick: move |_| dioxus::desktop::window().set_visible(false),
                     icons::IconClose { class: "w-3.5 h-3.5" }
                 }
             }
@@ -236,7 +197,7 @@ fn TraySetup() -> Element {
     // dioxus untuk `tray_icon::menu::MenuEvent` gagal diam-diam. Karena itu
     // `use_tray_menu_event_handler` tidak pernah terpanggil.
     use_muda_event_handler(move |event| match event.id().0.as_str() {
-        "show" => show_main_only(),
+        "show" => show_main(),
         "widget" => toggle_widget(),
         "quit" => {
             if let Some(tray) = &tray {
@@ -256,24 +217,24 @@ fn TraySetup() -> Element {
 fn spawn_widget_creation() {
     spawn(async move {
         let main_win = dioxus::desktop::window();
+        let (w, h) = WIDGET_SIZE_SMALL;
         let mut builder = WindowBuilder::new()
             .with_decorations(false)
             .with_resizable(false)
-            .with_always_on_top(true)
             .with_skip_taskbar(true)
             .with_visible(false)
-            .with_inner_size(LogicalSize::new(300.0, 280.0));
+            .with_inner_size(LogicalSize::new(w, h));
 
-        // Posisikan di pojok kanan-bawah layar.
+        // Posisi default: pojok kanan-atas monitor, margin WIDGET_MARGIN.
+        // (Tanpa always-on-top supaya tidak menghalangi window aktif.)
         if let Some(monitor) = main_win.current_monitor() {
             let scale = monitor.scale_factor();
-            let size = monitor.size();
-            let w = (300.0 * scale) as i32;
-            let h = (280.0 * scale) as i32;
-            let x = size.width as i32 - w - (12.0 * scale) as i32;
-            let y = size.height as i32 - h - (80.0 * scale) as i32;
-            builder =
-                builder.with_position(LogicalPosition::new(x as f64 / scale, y as f64 / scale));
+            let mon_pos = monitor.position();
+            let mon_size = monitor.size();
+            let m = (WIDGET_MARGIN * scale).round() as i32;
+            let x = mon_pos.x + mon_size.width as i32 - (w * scale).round() as i32 - m;
+            let y = mon_pos.y + m;
+            builder = builder.with_position(PhysicalPosition::new(x, y));
         }
 
         let cfg = Config::new()
@@ -284,8 +245,89 @@ fn spawn_widget_creation() {
             .new_window(VirtualDom::new(widget::WidgetApp), cfg)
             .await;
         *state::WIDGET_WINDOW.lock().unwrap() = Some(ctx.window.clone());
+        // Rapikan posisi awal (kompensasi border DWM di clamp) sebelum tampil.
+        clamp_widget_position(&ctx.window);
         ctx.window.set_visible(true);
     });
+}
+
+/// Snap posisi widget ke dalam monitor dengan margin `WIDGET_MARGIN` di semua
+/// sisi (batas terdekat ke tepi monitor 16px). Dipanggil saat drag selesai dan
+/// setelah ganti ukuran — selama drag, window bebas mengikuti kursor.
+/// Monitor yang lebih kecil dari window + margin di-fallback agar `clamp`
+/// tidak panik.
+pub(crate) fn clamp_widget_position(window: &Window) {
+    let Some(monitor) = window.current_monitor() else {
+        return;
+    };
+    let Ok(pos) = window.outer_position() else {
+        return;
+    };
+    let scale = monitor.scale_factor();
+    let m = (WIDGET_MARGIN * scale).round() as i32;
+    let mon_pos = monitor.position();
+    let mon_size = monitor.size();
+    let inner = window.inner_size();
+    let outer = window.outer_size();
+    // Rect window di Windows menyertakan border invisible DWM kiri/kanan
+    // (~9px fisik per sisi) sehingga konten terlihat mulai `border_left` dari
+    // sisi kiri rect. Kompensasi supaya margin visual kiri/kanan sama dengan
+    // atas/bawah. (Vertikal tidak berborder, jadi tidak perlu kompensasi.)
+    let border_left = (outer.width as i32 - inner.width as i32) / 2;
+    let min_x = mon_pos.x + m - border_left;
+    let min_y = mon_pos.y + m;
+    let max_x =
+        (mon_pos.x + mon_size.width as i32 - border_left - inner.width as i32 - m).max(min_x);
+    let max_y = (mon_pos.y + mon_size.height as i32 - inner.height as i32 - m).max(min_y);
+    let clamped = PhysicalPosition::new(pos.x.clamp(min_x, max_x), pos.y.clamp(min_y, max_y));
+    if clamped != pos {
+        window.set_outer_position(clamped);
+    }
+}
+
+/// Ganti ukuran widget kecil/besar lalu re-clamp posisinya (ukuran besar bisa
+/// meluber keluar monitor kalau widget sedang nempel di tepi kanan/bawah).
+pub(crate) fn apply_widget_size(window: &Window, large: bool) {
+    let (w, h) = if large {
+        WIDGET_SIZE_LARGE
+    } else {
+        WIDGET_SIZE_SMALL
+    };
+    window.set_inner_size(LogicalSize::new(w, h));
+    clamp_widget_position(window);
+}
+
+/// Pantau tombol kiri mouse selama drag native widget berjalan; begitu
+/// dilepas, snap posisi widget ke margin 16px semua sisi. Diperlukan karena
+/// `Window::drag()` di Windows async (PostMessage WM_NCLBUTTONDOWN) — fungsi
+/// itu kembali seketika dan tidak memberi tahu kapan drag selesai.
+pub(crate) fn watch_widget_drag_release() {
+    let Some(window) = state::WIDGET_WINDOW.lock().unwrap().clone() else {
+        return;
+    };
+    std::thread::spawn(move || {
+        let start = std::time::Instant::now();
+        // Batas aman 60 detik: drag normal jauh lebih cepat dari itu.
+        while start.elapsed() < std::time::Duration::from_secs(60) {
+            std::thread::sleep(std::time::Duration::from_millis(10));
+            if !left_button_held() {
+                break;
+            }
+        }
+        clamp_widget_position(&window);
+    });
+}
+
+/// True selagi tombol kiri mouse sedang ditahan.
+#[cfg(windows)]
+fn left_button_held() -> bool {
+    use windows::Win32::UI::Input::KeyboardAndMouse::{GetAsyncKeyState, VK_LBUTTON};
+    unsafe { (GetAsyncKeyState(VK_LBUTTON.0 as i32) as u16) & 0x8000 != 0 }
+}
+
+#[cfg(not(windows))]
+fn left_button_held() -> bool {
+    false
 }
 
 /// Tampilkan widget (window-nya dibuat lazy saat pertama kali).
@@ -315,23 +357,16 @@ pub fn hide_widget() {
     }
 }
 
-/// Ganti window yang tampil: main → widget. Invarian: hanya satu window
-/// yang terlihat pada satu waktu.
-pub fn show_widget_only() {
-    dioxus::desktop::window().set_visible(false);
-    show_widget();
-}
-
-/// Ganti window yang tampil: widget → main.
-pub fn show_main_only() {
-    hide_widget();
+/// Tampilkan window utama (Pengaturan) tanpa mengubah widget — main window
+/// dan widget boleh tampil bersamaan (main window kini khusus pengaturan).
+pub fn show_main() {
     let win = dioxus::desktop::window();
     win.set_minimized(false);
     win.set_visible(true);
     win.set_focus();
 }
 
-/// Toggle widget dari tray/klik kiri ikon.
+/// Toggle widget dari tray/klik kiri ikon (tidak menyentuh window utama).
 fn toggle_widget() {
     let visible = state::WIDGET_WINDOW
         .lock()
@@ -341,6 +376,6 @@ fn toggle_widget() {
     if visible {
         hide_widget();
     } else {
-        show_widget_only();
+        show_widget();
     }
 }
