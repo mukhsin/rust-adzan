@@ -61,7 +61,10 @@ pub fn tick(state: &mut EngineState, settings: &Settings, now: DateTime<Tz>) -> 
         // Trigger adzan: baru saja masuk waktu (0..=2s) dan belum diputar.
         if !state.played.contains(&kind) && elapsed >= Duration::zero() && elapsed <= tolerance {
             state.played.insert(kind);
-            if settings.audio_enabled {
+            // Sholat yang di-mute (bell-off di daftar jadwal) tidak memutar
+            // audio, notifikasi tetap dikirim.
+            let muted = settings.muted_prayers.contains(&kind);
+            if settings.audio_enabled && !muted {
                 actions.push(Action::PlayAdzan(kind));
             }
             if settings.notif_enabled {
@@ -111,33 +114,37 @@ pub fn start() {
 }
 
 fn execute(action: Action, settings: &Settings) {
+    use crate::i18n::tr;
+    let lang = settings.language;
     match action {
         Action::PlayAdzan(kind) => {
             let subuh = kind == PrayerKind::Subuh;
             match crate::audio::play_adzan(settings, subuh) {
                 Ok(()) => {
-                    crate::logger::info(&format!("masuk waktu {}: adzan diputar", kind.nama()))
+                    crate::logger::info(&format!("masuk waktu {}: adzan diputar", kind.nama(lang)))
                 }
                 Err(e) => {
-                    crate::logger::error(&format!("gagal memutar adzan {}: {e}", kind.nama()))
+                    crate::logger::error(&format!("gagal memutar adzan {}: {e}", kind.nama(lang)))
                 }
             }
         }
         Action::NotifyAdzan(kind) => {
             crate::notify::show(
-                "Masuk waktu sholat",
-                &format!("Telah masuk waktu sholat {}. Mari sholat. 🕌", kind.nama()),
+                tr(lang, "notif_adzan_title"),
+                &tr(lang, "notif_adzan_body").replace("{nama}", kind.nama(lang)),
             );
-            crate::logger::info(&format!("notifikasi masuk waktu {}", kind.nama()));
+            crate::logger::info(&format!("notifikasi masuk waktu {}", kind.nama(lang)));
         }
         Action::NotifyPre { kind, minutes } => {
             crate::notify::show(
-                "Pengingat adzan",
-                &format!("{} menit lagi masuk waktu sholat {}.", minutes, kind.nama()),
+                tr(lang, "notif_pre_title"),
+                &tr(lang, "notif_pre_body")
+                    .replace("{minutes}", &minutes.to_string())
+                    .replace("{nama}", kind.nama(lang)),
             );
             crate::logger::info(&format!(
                 "notifikasi pengingat {} ({minutes} menit)",
-                kind.nama()
+                kind.nama(lang)
             ));
         }
     }
@@ -157,20 +164,6 @@ mod tests {
         let d = NaiveDate::from_ymd_opt(date.0, date.1, date.2).unwrap();
         let dt = d.and_hms_opt(t.0, t.1, t.2).unwrap();
         tz.from_local_datetime(&dt).unwrap()
-    }
-
-    fn times_fixture() -> DayTimes {
-        let hm = |h: u32, m: u32| NaiveTime::from_hms_opt(h, m, 0).unwrap();
-        DayTimes {
-            imsak: hm(4, 20),
-            subuh: hm(4, 30),
-            terbit: hm(5, 45),
-            dzuhur: hm(11, 58),
-            ashar: hm(15, 18),
-            maghrib: hm(17, 50),
-            isya: hm(19, 2),
-            subuh_esok: hm(4, 30),
-        }
     }
 
     // Tick nyata memanggil day_times (perhitungan astronomis); untuk test deterministik
@@ -289,6 +282,41 @@ mod tests {
             "{actions:?}"
         );
         assert!(actions.contains(&Action::NotifyAdzan(PrayerKind::Subuh)));
+    }
+
+    #[test]
+    fn sholat_dimute_tidak_mainkan_adzan() {
+        // Bell-off pada satu sholat: audio diam, notifikasi tetap jalan,
+        // sholat lain tidak terpengaruh.
+        let mut s = settings_dengan_jadwal();
+        s.muted_prayers = vec![PrayerKind::Subuh];
+        let mut state = EngineState::new();
+        let date = (2026, 10, 15);
+        let times = day_times(&s, NaiveDate::from_ymd_opt(2026, 10, 15).unwrap()).unwrap();
+
+        let now = fake_now(
+            s.timezone(),
+            date,
+            (times.subuh.hour(), times.subuh.minute(), 0),
+        );
+        let actions = tick(&mut state, &s, now);
+        assert!(
+            !actions.iter().any(|a| matches!(a, Action::PlayAdzan(_))),
+            "adzan Subuh di-mute, tidak boleh PlayAdzan: {actions:?}"
+        );
+        assert!(actions.contains(&Action::NotifyAdzan(PrayerKind::Subuh)));
+
+        // Maghrib (tidak di-mute) tetap memutar adzan.
+        let now = fake_now(
+            s.timezone(),
+            date,
+            (times.maghrib.hour(), times.maghrib.minute(), 0),
+        );
+        let actions = tick(&mut state, &s, now);
+        assert!(
+            actions.contains(&Action::PlayAdzan(PrayerKind::Maghrib)),
+            "{actions:?}"
+        );
     }
 
     #[test]

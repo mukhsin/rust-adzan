@@ -47,6 +47,7 @@ pub fn app() -> Element {
     if *theme.read() != state::settings().theme {
         theme.set(state::settings().theme);
     }
+    let lang = state::settings().language;
 
     // Perintah lintas window: tombol pengaturan di widget menampilkan window
     // utama. `dioxus::desktop::window()` di dom widget menunjuk widget, jadi
@@ -67,6 +68,15 @@ pub fn app() -> Element {
         }
     });
 
+    // Saat startup hanya widget yang tampil — window pengaturan tetap
+    // tersembunyi sampai dibuka lewat tray / tombol pengaturan di widget.
+    use_future(move || async move {
+        // Jeda sekejap agar inisialisasi menu tray (TraySetup) selesai dulu,
+        // supaya centang "Widget Desktop" ikut tersinkron.
+        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+        show_widget();
+    });
+
     let mut root_class = String::from(
         "h-screen w-screen flex flex-col overflow-hidden font-sans \
          bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-50 \
@@ -80,7 +90,7 @@ pub fn app() -> Element {
         style { {TAILWIND_CSS} }
         TraySetup {}
         div { class: "{root_class}",
-            TitleBar { title: "Pengaturan" }
+            TitleBar { title: crate::i18n::tr(lang, "settings_title") }
             settings_view::SettingsView {}
         }
     }
@@ -90,6 +100,7 @@ pub fn app() -> Element {
 /// Seluruh bar bisa dipakai drag window.
 #[component]
 pub fn TitleBar(title: &'static str) -> Element {
+    let lang = state::settings().language;
     rsx! {
         div {
             class: "h-10 shrink-0 flex items-center justify-between px-3 select-none cursor-default bg-zinc-50 dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800 transition-colors duration-300",
@@ -99,7 +110,7 @@ pub fn TitleBar(title: &'static str) -> Element {
 
             button {
                 class: "p-1.5 rounded-md hover:bg-red-500 hover:text-white dark:hover:bg-red-500 dark:hover:text-white text-zinc-500 dark:text-zinc-400 transition-colors",
-                title: "Tutup (tetap berjalan di tray)",
+                title: crate::i18n::tr(lang, "close_hint"),
                 onmousedown: move |e| e.stop_propagation(),
                 onclick: move |_| dioxus::desktop::window().set_visible(false),
                 icons::IconClose { class: "w-3.5 h-3.5" }
@@ -113,10 +124,17 @@ pub fn TitleBar(title: &'static str) -> Element {
 fn TraySetup() -> Element {
     // Inisialisasi tray (sekali) — jangan memanggil hook lain di dalam use_hook.
     use_hook(|| {
+        let lang = state::settings().language;
         let menu = Menu::new();
-        let show = MenuItem::with_id("show", "Tampilkan Jendela", true, None);
-        let widget = CheckMenuItem::with_id("widget", "Widget Desktop", true, false, None);
-        let quit = MenuItem::with_id("quit", "Keluar", true, None);
+        let show = MenuItem::with_id("show", crate::i18n::tr(lang, "menu_show"), true, None);
+        let widget = CheckMenuItem::with_id(
+            "widget",
+            crate::i18n::tr(lang, "menu_widget"),
+            true,
+            false,
+            None,
+        );
+        let quit = MenuItem::with_id("quit", crate::i18n::tr(lang, "menu_quit"), true, None);
         menu.append_items(&[
             &show,
             &PredefinedMenuItem::separator(),
@@ -130,10 +148,16 @@ fn TraySetup() -> Element {
             .expect("tray icon");
         let _tray = init_tray_icon(menu, Some(icon));
         WIDGET_MENU_ITEM.with(|cell| *cell.borrow_mut() = Some(widget));
+        state::TRAY_SHOW_ITEM.with(|cell| *cell.borrow_mut() = Some(show));
+        state::TRAY_QUIT_ITEM.with(|cell| *cell.borrow_mut() = Some(quit));
+        TRAY_LANG.with(|cell| cell.set(Some(lang)));
     });
 
     // Hook di level atas komponen, bukan di dalam hook lain.
     let tray = use_tray_icon();
+
+    // Menu tray ikut ganti bahasa tanpa restart (render = main thread).
+    sync_tray_language(state::settings().language);
 
     // Klik kiri ikon tray: toggle widget desktop.
     // Event `Click` di-emit dua kali (press & release) — reaksi hanya saat
@@ -167,6 +191,44 @@ fn TraySetup() -> Element {
     });
 
     rsx! {}
+}
+
+thread_local! {
+    /// Bahasa yang sedang tampil di menu tray — untuk deteksi perubahan.
+    static TRAY_LANG: std::cell::Cell<Option<crate::settings::Language>>
+        = const { std::cell::Cell::new(None) };
+}
+
+/// Ganti teks item menu tray bila bahasa settings berubah.
+/// Dipanggil dari render TraySetup (main thread — item muda tidak Send).
+fn sync_tray_language(lang: crate::settings::Language) {
+    let changed = TRAY_LANG.with(|cell| {
+        if cell.get() != Some(lang) {
+            cell.set(Some(lang));
+            true
+        } else {
+            false
+        }
+    });
+    if !changed {
+        return;
+    }
+    use crate::i18n::tr;
+    WIDGET_MENU_ITEM.with(|cell| {
+        if let Some(item) = cell.borrow().as_ref() {
+            item.set_text(tr(lang, "menu_widget"));
+        }
+    });
+    state::TRAY_SHOW_ITEM.with(|cell| {
+        if let Some(item) = cell.borrow().as_ref() {
+            item.set_text(tr(lang, "menu_show"));
+        }
+    });
+    state::TRAY_QUIT_ITEM.with(|cell| {
+        if let Some(item) = cell.borrow().as_ref() {
+            item.set_text(tr(lang, "menu_quit"));
+        }
+    });
 }
 
 /// Buat widget window (lazy — dipanggil saat pertama kali widget dibutuhkan).
@@ -205,7 +267,11 @@ fn spawn_widget_creation() {
         *state::WIDGET_WINDOW.lock().unwrap() = Some(ctx.window.clone());
         // Rapikan posisi awal (kompensasi border DWM di clamp) sebelum tampil.
         clamp_widget_position(&ctx.window);
-        ctx.window.set_visible(true);
+        // Window TIDAK dimunculkan di sini: saat webview selesai load, dioxus
+        // memanggil set_visible(is_visible_before_start) yang nilainya false
+        // (window utama kini mulai tersembunyi) sehingga akan menutup widget
+        // lagi. Widget memunculkan dirinya sendiri via use_effect di WidgetApp
+        // setelah event initialize — sekaligus menghindari kedipan putih.
     });
 }
 

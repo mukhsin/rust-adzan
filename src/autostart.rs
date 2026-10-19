@@ -6,17 +6,21 @@ const VALUE_NAME: &str = "JadwalSholat";
 const LEGACY_VALUE_NAME: &str = "RustAdzan";
 
 /// Set/hapus auto-start via registry HKCU Run (tidak butuh hak admin).
+/// Pesan error memakai bahasa UI saat itu (dibaca dari settings global).
 pub fn set_enabled(enable: bool) -> Result<(), String> {
+    use crate::i18n::tr;
+    let lang = crate::state::settings().language;
     let hkcu = RegKey::predef(HKEY_CURRENT_USER);
     let key = hkcu
         .open_subkey_with_flags(RUN_KEY, KEY_SET_VALUE | KEY_QUERY_VALUE)
-        .map_err(|e| format!("gagal buka registry Run: {e}"))?;
+        .map_err(|e| format!("{}: {e}", tr(lang, "err_reg_open")))?;
 
     if enable {
-        let exe = std::env::current_exe().map_err(|e| format!("gagal dapat path exe: {e}"))?;
+        let exe =
+            std::env::current_exe().map_err(|e| format!("{}: {e}", tr(lang, "err_exe_path")))?;
         let quoted = format!("\"{}\"", exe.display());
         key.set_value(VALUE_NAME, &quoted)
-            .map_err(|e| format!("gagal tulis registry: {e}"))?;
+            .map_err(|e| format!("{}: {e}", tr(lang, "err_reg_write")))?;
     } else {
         // Tidak masalah jika value tidak ada.
         let _ = key.delete_value(VALUE_NAME);

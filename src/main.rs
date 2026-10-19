@@ -5,6 +5,7 @@
 mod audio;
 mod autostart;
 mod cities;
+mod i18n;
 mod logger;
 mod notify;
 mod prayer;
@@ -38,7 +39,10 @@ fn main() {
                 .with_title(crate::settings::APP_NAME)
                 .with_decorations(false) // frameless: title bar custom di ui::TitleBar
                 .with_inner_size(LogicalSize::new(400.0, 700.0))
-                .with_min_inner_size(LogicalSize::new(380.0, 620.0)),
+                .with_min_inner_size(LogicalSize::new(380.0, 620.0))
+                // Saat startup hanya widget yang tampil; window pengaturan
+                // baru muncul saat dibuka eksplisit (tray / tombol di widget).
+                .with_visible(false),
         )
         .with_icon(window_icon)
         // Tombol close hanya menyembunyikan window; app tetap jalan di tray.

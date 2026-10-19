@@ -1,5 +1,6 @@
 use super::icons;
-use super::schedule::{BULAN, HARI, Header, PrayerList};
+use super::schedule::{Header, PrayerList};
+use crate::i18n::{day_name, month_name, tr};
 use crate::prayer;
 use crate::settings::Theme;
 use crate::state;
@@ -14,6 +15,15 @@ use dioxus::prelude::*;
 /// `crate::ui::clamp_widget_position`.
 #[allow(non_snake_case)]
 pub fn WidgetApp() -> Element {
+    // Window widget dibuat tersembunyi; tampilkan setelah dom siap. Efek ini
+    // berjalan pada poll setelah event initialize — yaitu SETELAH dioxus
+    // menyetel ulang visibilitas window (set_visible(is_visible_before_start)
+    // = false karena window utama mulai tersembunyi), jadi dipanggilannya
+    // tidak tertimpa dan widget tampil dengan konten siap tanpa kedipan.
+    use_effect(move || {
+        dioxus::desktop::window().set_visible(true);
+    });
+
     let mut tick = use_signal(|| 0u64);
     use_future(move || async move {
         loop {
@@ -34,6 +44,7 @@ pub fn WidgetApp() -> Element {
     }
 
     let settings = state::settings();
+    let lang = settings.language;
     let now = prayer::now_in_tz(&settings);
     let times = prayer::day_times(&settings, now.date_naive());
     let lokasi = match &settings.city {
@@ -42,9 +53,9 @@ pub fn WidgetApp() -> Element {
     };
     let tanggal = format!(
         "{}, {} {} {}",
-        HARI[now.weekday().num_days_from_monday() as usize],
+        day_name(lang, now.weekday().num_days_from_monday() as usize),
         now.day(),
-        BULAN[(now.month() - 1) as usize],
+        month_name(lang, (now.month() - 1) as usize),
         now.year()
     );
 
@@ -84,13 +95,13 @@ pub fn WidgetApp() -> Element {
 
                 div { class: "flex items-center gap-2",
                     icons::Mosque { class: "w-4 h-4 text-zinc-600 dark:text-zinc-300" }
-                    span { class: "text-xs font-medium text-zinc-600 dark:text-zinc-300", "Jadwal Sholat" }
+                    span { class: "text-xs font-medium text-zinc-600 dark:text-zinc-300", "{tr(lang, \"app_name\")}" }
                 }
 
                 div { class: "flex items-center gap-1",
                     button {
                         class: "{btn}",
-                        title: "Ganti tema",
+                        title: "{tr(lang, \"toggle_theme\")}",
                         onmousedown: move |e| e.stop_propagation(),
                         onclick: move |_| {
                             let next = if dark { Theme::Light } else { Theme::Dark };
@@ -107,7 +118,7 @@ pub fn WidgetApp() -> Element {
                     }
                     button {
                         class: "{btn}",
-                        title: "Buka Pengaturan",
+                        title: "{tr(lang, \"open_settings\")}",
                         onmousedown: move |e| e.stop_propagation(),
                         onclick: move |_| {
                             // Widget tetap tampil — main window boleh bersamaan.
@@ -117,7 +128,7 @@ pub fn WidgetApp() -> Element {
                     }
                     button {
                         class: "{btn}",
-                        title: if is_expanded { "Perkecil widget" } else { "Tampilkan jadwal lengkap" },
+                        title: if is_expanded { tr(lang, "shrink_widget") } else { tr(lang, "expand_widget") },
                         onmousedown: move |e| e.stop_propagation(),
                         onclick: move |_| {
                             let next = !*expanded.read();
@@ -144,7 +155,7 @@ pub fn WidgetApp() -> Element {
                 },
                 None => rsx! {
                     div { class: "flex-1 flex items-center justify-center text-xs text-zinc-500",
-                        "Gagal menghitung jadwal."
+                        "{tr(lang, \"calc_failed\")}"
                     }
                 },
             }}

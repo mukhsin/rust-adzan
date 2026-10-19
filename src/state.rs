@@ -39,6 +39,14 @@ thread_local! {
     /// tetapi handler tray dan setup selalu berjalan di main thread, jadi thread_local aman.
     pub static WIDGET_MENU_ITEM: std::cell::RefCell<Option<dioxus::desktop::trayicon::menu::CheckMenuItem>>
         = const { std::cell::RefCell::new(None) };
+
+    /// Handle item "Tampilkan Jendela" di tray — teksnya diganti saat bahasa UI berubah.
+    pub static TRAY_SHOW_ITEM: std::cell::RefCell<Option<dioxus::desktop::trayicon::menu::MenuItem>>
+        = const { std::cell::RefCell::new(None) };
+
+    /// Handle item "Keluar" di tray — teksnya diganti saat bahasa UI berubah.
+    pub static TRAY_QUIT_ITEM: std::cell::RefCell<Option<dioxus::desktop::trayicon::menu::MenuItem>>
+        = const { std::cell::RefCell::new(None) };
 }
 
 pub fn settings() -> Arc<Settings> {

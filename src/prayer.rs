@@ -25,14 +25,20 @@ pub const ADZAN_PRAYERS: [PrayerKind; 5] = [
 ];
 
 impl PrayerKind {
-    pub fn nama(&self) -> &'static str {
+    /// Kunci terjemahan nama sholat (lihat `i18n::PHRASES`).
+    pub fn key(&self) -> &'static str {
         match self {
-            PrayerKind::Subuh => "Subuh",
-            PrayerKind::Dzuhur => "Dzuhur",
-            PrayerKind::Ashar => "Ashar",
-            PrayerKind::Maghrib => "Maghrib",
-            PrayerKind::Isya => "Isya",
+            PrayerKind::Subuh => "subuh",
+            PrayerKind::Dzuhur => "dzuhur",
+            PrayerKind::Ashar => "ashar",
+            PrayerKind::Maghrib => "maghrib",
+            PrayerKind::Isya => "isya",
         }
+    }
+
+    /// Nama sholat sesuai bahasa UI.
+    pub fn nama(&self, lang: crate::settings::Language) -> &'static str {
+        crate::i18n::tr(lang, self.key())
     }
 }
 

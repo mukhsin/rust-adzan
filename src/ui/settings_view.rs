@@ -1,7 +1,8 @@
 use super::icons;
 use crate::autostart;
 use crate::cities::{CITIES, find_city};
-use crate::settings::{CalcMethod, MadhabChoice, Settings};
+use crate::i18n::tr;
+use crate::settings::{CalcMethod, Language, MadhabChoice, Settings};
 use crate::state;
 use dioxus::prelude::*;
 use std::path::PathBuf;
@@ -32,6 +33,8 @@ pub fn SettingsView() -> Element {
     // Draft lokal; setiap perubahan langsung disimpan + disebarkan.
     let mut draft = use_signal(|| (*state::settings()).clone());
     let mut dialog = use_signal(|| Dialog::None);
+    let lang = state::settings().language;
+    let versi = tr(lang, "version_label").replace("{versi}", env!("CARGO_PKG_VERSION"));
     // Status pemutaran per slot (di-poll berkala agar ikon play/stop akurat).
     let mut playing_umum = use_signal(|| crate::audio::is_playing(crate::audio::Slot::Umum));
     let mut playing_subuh = use_signal(|| crate::audio::is_playing(crate::audio::Slot::Subuh));
@@ -58,9 +61,9 @@ pub fn SettingsView() -> Element {
     rsx! {
         div { class: "flex-1 p-5 flex flex-col gap-4 overflow-y-auto",
 
-            div { class: "text-xs uppercase tracking-wider text-zinc-400 dark:text-zinc-500 font-medium px-1 mt-1", "Lokasi" }
+            div { class: "text-xs uppercase tracking-wider text-zinc-400 dark:text-zinc-500 font-medium px-1 mt-1", "{tr(lang, \"sec_location\")}" }
             div { class: "bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 rounded-xl p-4 flex flex-col gap-3",
-                Field { label: "Kota",
+                Field { label: tr(lang, "f_city"),
                     select {
                         class: "{SELECT}",
                         value: draft.read().city.clone().unwrap_or_default(),
@@ -75,13 +78,13 @@ pub fn SettingsView() -> Element {
                                 apply(s);
                             }
                         },
-                        option { value: "", "— Koordinat manual —" }
+                        option { value: "", "{tr(lang, \"city_manual\")}" }
                         for city in CITIES {
                             option { value: city.name, "{city.name}" }
                         }
                     }
                 }
-                Field { label: "Latitude",
+                Field { label: tr(lang, "f_lat"),
                     input {
                         class: "{INPUT}",
                         r#type: "text",
@@ -96,7 +99,7 @@ pub fn SettingsView() -> Element {
                         },
                     }
                 }
-                Field { label: "Longitude",
+                Field { label: tr(lang, "f_lng"),
                     input {
                         class: "{INPUT}",
                         r#type: "text",
@@ -111,7 +114,7 @@ pub fn SettingsView() -> Element {
                         },
                     }
                 }
-                Field { label: "Zona Waktu",
+                Field { label: tr(lang, "f_tz"),
                     select {
                         class: "{SELECT}",
                         value: draft.read().timezone.clone(),
@@ -131,9 +134,9 @@ pub fn SettingsView() -> Element {
                 }
             }
 
-            div { class: "text-xs uppercase tracking-wider text-zinc-400 dark:text-zinc-500 font-medium px-1", "Perhitungan" }
+            div { class: "text-xs uppercase tracking-wider text-zinc-400 dark:text-zinc-500 font-medium px-1", "{tr(lang, \"sec_calc\")}" }
             div { class: "bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 rounded-xl p-4 flex flex-col gap-3",
-                Field { label: "Metode",
+                Field { label: tr(lang, "f_method"),
                     select {
                         class: "{SELECT}",
                         value: method_name(draft.read().method),
@@ -145,15 +148,15 @@ pub fn SettingsView() -> Element {
                                 apply(s);
                             }
                         },
-                        option { value: "kemenag", "Kemenag (Subuh 20°, Isya 18°)" }
-                        option { value: "mwl", "Muslim World League" }
-                        option { value: "egyptian", "Egyptian General Authority" }
-                        option { value: "karachi", "Universitas Karachi" }
-                        option { value: "umm_al_qura", "Umm al-Qura, Makkah" }
-                        option { value: "north_america", "ISNA (Amerika Utara)" }
+                        option { value: "kemenag", "{tr(lang, \"m_kemenag\")}" }
+                        option { value: "mwl", "{tr(lang, \"m_mwl\")}" }
+                        option { value: "egyptian", "{tr(lang, \"m_egyptian\")}" }
+                        option { value: "karachi", "{tr(lang, \"m_karachi\")}" }
+                        option { value: "umm_al_qura", "{tr(lang, \"m_umm_al_qura\")}" }
+                        option { value: "north_america", "{tr(lang, \"m_isna\")}" }
                     }
                 }
-                Field { label: "Mazhab (Ashar)",
+                Field { label: tr(lang, "f_madhab"),
                     select {
                         class: "{SELECT}",
                         value: match draft.read().madhab { MadhabChoice::Shafi => "shafi", MadhabChoice::Hanafi => "hanafi" },
@@ -163,15 +166,15 @@ pub fn SettingsView() -> Element {
                             s.madhab = if v == "hanafi" { MadhabChoice::Hanafi } else { MadhabChoice::Shafi };
                             apply(s);
                         },
-                        option { value: "shafi", "Syafi'i / Maliki / Hambali" }
-                        option { value: "hanafi", "Hanafi" }
+                        option { value: "shafi", "{tr(lang, \"madhab_shafi\")}" }
+                        option { value: "hanafi", "{tr(lang, \"madhab_hanafi\")}" }
                     }
                 }
             }
 
-            div { class: "text-xs uppercase tracking-wider text-zinc-400 dark:text-zinc-500 font-medium px-1", "Audio Adzan" }
+            div { class: "text-xs uppercase tracking-wider text-zinc-400 dark:text-zinc-500 font-medium px-1", "{tr(lang, \"sec_audio\")}" }
             div { class: "bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 rounded-xl p-4 flex flex-col gap-3",
-                Field { label: "Mainkan adzan saat masuk waktu",
+                Field { label: tr(lang, "f_audio_enabled"),
                     Switch {
                         checked: draft.read().audio_enabled,
                         on_change: move |on| {
@@ -181,7 +184,7 @@ pub fn SettingsView() -> Element {
                         },
                     }
                 }
-                Field { label: "Volume", hint: "{(draft.read().volume * 100.0) as i32}%",
+                Field { label: tr(lang, "f_volume"), hint: "{(draft.read().volume * 100.0) as i32}%",
                     input {
                         class: "w-32 accent-zinc-900 dark:accent-zinc-100",
                         r#type: "range",
@@ -196,25 +199,25 @@ pub fn SettingsView() -> Element {
                         },
                     }
                 }
-                Field { label: "File adzan", hint: deskripsi_sumber(&draft.read(), false),
+                Field { label: tr(lang, "f_adzan_file"), hint: deskripsi_sumber(&draft.read(), false),
                     div { class: "flex items-center gap-1.5",
                         button {
                             class: "{BTN_GHOST}",
                             onclick: move |_| {
-                                if let Some(p) = pick_audio() {
+                                if let Some(p) = pick_audio(lang) {
                                     let mut s = draft.read().clone();
                                     s.adzan_file = Some(p);
                                     apply(s);
                                 }
                             },
-                            "Pilih…"
+                            "{tr(lang, \"pick\")}"
                         }
                         button {
                             class: "{BTN_ICON}",
                             title: if *playing_umum.read() {
-                                "Hentikan pemutaran"
+                                tr(lang, "stop_play")
                             } else {
-                                "Tes putar adzan"
+                                tr(lang, "test_play")
                             },
                             onclick: move |_| {
                                 if *playing_umum.read() {
@@ -232,25 +235,25 @@ pub fn SettingsView() -> Element {
                         }
                     }
                 }
-                Field { label: "File khusus Subuh", hint: deskripsi_sumber(&draft.read(), true),
+                Field { label: tr(lang, "f_subuh_file"), hint: deskripsi_sumber(&draft.read(), true),
                     div { class: "flex items-center gap-1.5",
                         button {
                             class: "{BTN_GHOST}",
                             onclick: move |_| {
-                                if let Some(p) = pick_audio() {
+                                if let Some(p) = pick_audio(lang) {
                                     let mut s = draft.read().clone();
                                     s.subuh_file = Some(p);
                                     apply(s);
                                 }
                             },
-                            "Pilih…"
+                            "{tr(lang, \"pick\")}"
                         }
                         button {
                             class: "{BTN_ICON}",
                             title: if *playing_subuh.read() {
-                                "Hentikan pemutaran"
+                                tr(lang, "stop_play")
                             } else {
-                                "Tes putar adzan Subuh"
+                                tr(lang, "test_play_subuh")
                             },
                             onclick: move |_| {
                                 if *playing_subuh.read() {
@@ -270,9 +273,9 @@ pub fn SettingsView() -> Element {
                 }
             }
 
-            div { class: "text-xs uppercase tracking-wider text-zinc-400 dark:text-zinc-500 font-medium px-1", "Notifikasi" }
+            div { class: "text-xs uppercase tracking-wider text-zinc-400 dark:text-zinc-500 font-medium px-1", "{tr(lang, \"sec_notif\")}" }
             div { class: "bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 rounded-xl p-4 flex flex-col gap-3",
-                Field { label: "Tampilkan toast notifikasi",
+                Field { label: tr(lang, "f_notif_enabled"),
                     Switch {
                         checked: draft.read().notif_enabled,
                         on_change: move |on| {
@@ -282,11 +285,11 @@ pub fn SettingsView() -> Element {
                         },
                     }
                 }
-                Field { label: "Pengingat sebelum adzan", hint: "Menit sebelum waktu masuk",
+                Field { label: tr(lang, "f_pre_notif"), hint: tr(lang, "hint_pre_notif"),
                     div { class: "flex items-center gap-2",
                         button {
                             class: "{BTN_ICON}",
-                            title: "Kurangi",
+                            title: tr(lang, "dec"),
                             onclick: move |_| {
                                 let mut s = draft.read().clone();
                                 if s.pre_notif_minutes > 1 {
@@ -301,7 +304,7 @@ pub fn SettingsView() -> Element {
                         }
                         button {
                             class: "{BTN_ICON}",
-                            title: "Tambah",
+                            title: tr(lang, "inc"),
                             onclick: move |_| {
                                 let mut s = draft.read().clone();
                                 s.pre_notif_minutes = (s.pre_notif_minutes + 1).min(60);
@@ -313,9 +316,22 @@ pub fn SettingsView() -> Element {
                 }
             }
 
-            div { class: "text-xs uppercase tracking-wider text-zinc-400 dark:text-zinc-500 font-medium px-1", "Lainnya" }
+            div { class: "text-xs uppercase tracking-wider text-zinc-400 dark:text-zinc-500 font-medium px-1", "{tr(lang, \"sec_misc\")}" }
             div { class: "bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 rounded-xl p-4 flex flex-col gap-3",
-                Field { label: "Jalankan saat Windows menyala",
+                Field { label: tr(lang, "f_language"),
+                    select {
+                        class: "{SELECT}",
+                        value: match draft.read().language { Language::Id => "id", Language::En => "en" },
+                        onchange: move |e| {
+                            let mut s = draft.read().clone();
+                            s.language = if e.value() == "en" { Language::En } else { Language::Id };
+                            apply(s);
+                        },
+                        option { value: "en", "English" }
+                        option { value: "id", "Bahasa Indonesia" }
+                    }
+                }
+                Field { label: tr(lang, "f_autostart"),
                     Switch {
                         checked: draft.read().autostart,
                         on_change: move |on| {
@@ -334,21 +350,22 @@ pub fn SettingsView() -> Element {
                 }
             }
 
-            div { class: "flex justify-center pt-1 pb-2",
+            div { class: "flex flex-col items-center gap-2 pt-1 pb-2",
                 button {
                     class: "px-3 py-1.5 rounded-lg text-xs font-medium border border-red-300 dark:border-red-900/60 text-red-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors",
                     onclick: move |_| dialog.set(Dialog::ResetConfirm),
-                    "Reset semua pengaturan"
+                    "{tr(lang, \"reset_btn\")}"
                 }
+                span { class: "text-sm text-zinc-400 dark:text-zinc-600 select-none", "{versi}" }
             }
 
             {match dialog.read().clone() {
                 Dialog::None => rsx! {},
                 Dialog::ResetConfirm => rsx! {
                     Modal {
-                        title: "Reset semua pengaturan",
-                        message: "Kembalikan SEMUA pengaturan ke bawaan? (lokasi, audio, notifikasi, tema, auto-start)",
-                        confirm_text: "Ya, reset",
+                        title: tr(lang, "reset_btn"),
+                        message: tr(lang, "modal_reset_msg"),
+                        confirm_text: tr(lang, "confirm_reset"),
                         danger: true,
                         show_cancel: true,
                         on_confirm: move |_| {
@@ -363,7 +380,7 @@ pub fn SettingsView() -> Element {
                 },
                 Dialog::AutostartError(err) => rsx! {
                     Modal {
-                        title: "Auto-start",
+                        title: tr(lang, "autostart_title"),
                         message: err.clone(),
                         confirm_text: "OK",
                         danger: false,
@@ -389,6 +406,7 @@ fn Modal(
     on_confirm: EventHandler<()>,
     on_cancel: EventHandler<()>,
 ) -> Element {
+    let lang = state::settings().language;
     rsx! {
         div {
             class: "fixed inset-0 z-50 flex items-center justify-center bg-black/60",
@@ -403,7 +421,7 @@ fn Modal(
                         button {
                             class: "{BTN_GHOST}",
                             onclick: move |_| on_cancel.call(()),
-                            "Batal"
+                            "{tr(lang, \"cancel\")}"
                         }
                     }
                     button {
@@ -476,16 +494,17 @@ fn method_from_name(s: &str) -> Option<CalcMethod> {
     }
 }
 
-fn pick_audio() -> Option<PathBuf> {
+fn pick_audio(lang: Language) -> Option<PathBuf> {
     rfd::FileDialog::new()
         .add_filter("Audio", &["mp3", "wav", "ogg", "flac", "m4a", "aac"])
-        .set_title("Pilih file adzan")
+        .set_title(tr(lang, "pick_audio_title"))
         .pick_file()
 }
 
 /// Deskripsi sumber audio aktif saat ini (kustom / file / bawaan ter-embed)
 /// untuk ditampilkan di settings. `subuh` memilih baris mana yang dideskripsi.
 fn deskripsi_sumber(s: &Settings, subuh: bool) -> String {
+    let lang = s.language;
     let resolved = if subuh {
         crate::audio::resolve_subuh(s)
     } else {
@@ -504,11 +523,11 @@ fn deskripsi_sumber(s: &Settings, subuh: bool) -> String {
                 s.adzan_file.as_ref() == Some(&p)
             };
             if kustom {
-                format!("Kustom: {nama}")
+                tr(lang, "src_custom").replace("{nama}", &nama)
             } else {
-                format!("File: {nama}")
+                tr(lang, "src_file").replace("{nama}", &nama)
             }
         }
-        None => "Bawaan (ter-embed)".to_string(),
+        None => tr(lang, "src_embedded").to_string(),
     }
 }

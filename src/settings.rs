@@ -40,6 +40,14 @@ impl Theme {
     }
 }
 
+/// Bahasa UI aplikasi.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub enum Language {
+    #[default]
+    Id,
+    En,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Settings {
@@ -67,6 +75,10 @@ pub struct Settings {
 
     pub autostart: bool,
     pub theme: Theme,
+    pub language: Language,
+    /// Sholat yang adzannya di-mute (icon bell-off di daftar jadwal):
+    /// tidak ada pemutaran audio, notifikasi tetap jalan.
+    pub muted_prayers: Vec<crate::prayer::PrayerKind>,
 }
 
 impl Default for Settings {
@@ -87,6 +99,8 @@ impl Default for Settings {
             pre_notif_minutes: 10,
             autostart: false,
             theme: Theme::Dark,
+            language: Language::Id,
+            muted_prayers: Vec::new(),
         }
     }
 }
@@ -167,6 +181,11 @@ mod tests {
         s.volume = 0.42;
         s.pre_notif_minutes = 15;
         s.theme = Theme::Light;
+        s.language = Language::En;
+        s.muted_prayers = vec![
+            crate::prayer::PrayerKind::Subuh,
+            crate::prayer::PrayerKind::Isya,
+        ];
 
         let json = serde_json::to_string(&s).unwrap();
         let back: Settings = serde_json::from_str(&json).unwrap();
