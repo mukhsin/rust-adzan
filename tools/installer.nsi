@@ -11,7 +11,7 @@ ManifestDPIAware true
 
 !define APPNAME "Jadwal Sholat"
 !define EXENAME "rust-adzan.exe"
-!define VERSION "0.2.0"
+!define VERSION "0.3.0"
 !define UNINSTKEY "JadwalSholat"
 !define ARP_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\${UNINSTKEY}"
 !define WEBVIEW2_KEY "SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}"
