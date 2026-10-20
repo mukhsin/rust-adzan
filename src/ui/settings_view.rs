@@ -638,7 +638,9 @@ fn Modal(
     let lang = state::settings().language;
     rsx! {
         div {
-            class: "fixed inset-0 z-50 flex items-center justify-center bg-ink/60",
+            // Scrim gelap di KEDUA tema — bg-ink/60 akan jadi putih di tema
+            // gelap karena ink terbalik (#ece9e2).
+            class: "fixed inset-0 z-50 flex items-center justify-center bg-black/60",
             onclick: move |_| on_cancel.call(()),
             div {
                 class: "w-80 bg-pass border border-pass-line rounded-[14px] p-5 shadow-[0_8px_18px_#14161a1a] dark:shadow-[0_8px_18px_#00000080] flex flex-col gap-2",
