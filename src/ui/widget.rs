@@ -2,14 +2,84 @@
 //! pen): kiri identitas + hitung mundur + status, kanan papan jadwal hari ini
 //! dengan lonceng adzan per baris. Seluruh kartu bisa didrag native; klik
 //! ganda membuka window pengaturan.
+//!
+//! Kartu tiket yang sama dipakai ulang di layar Harian window utama
+//! ([`DailyView`]) — info yang ditampilkan identik.
 
 use super::icons;
 use crate::hijri;
 use crate::i18n::{day_name, month_name, tr};
 use crate::prayer::{self, DayTimes, PrayerKind};
+use crate::settings::Language;
 use crate::state;
-use chrono::{Datelike, NaiveTime};
+use chrono::{DateTime, Datelike, NaiveTime};
+use chrono_tz::Tz;
 use dioxus::prelude::*;
+
+/// Label (hari, tanggal masehi, tanggal hijri) untuk kartu tiket — dipakai
+/// widget dan layar Harian.
+fn tanggal_labels(lang: Language, now: &DateTime<Tz>) -> (String, String, String) {
+    (
+        day_name(lang, now.weekday().num_days_from_monday() as usize).to_string(),
+        format!(
+            "{} {} {}",
+            now.day(),
+            month_name(lang, (now.month() - 1) as usize),
+            now.year()
+        ),
+        hijri::format(lang, now.date_naive()),
+    )
+}
+
+/// Layar Harian window utama — kartu tiket yang sama persis dengan widget
+/// (identitas + hitung mundur + papan jadwal), ditampilkan di tengah lembar
+/// dengan sudut membulat + shadow. Mockup pen punya panel kanan yang berbeda,
+/// tapi isinya sudah tercakup di kartu ini sehingga kartu widget dipakai
+/// langsung.
+#[component]
+pub fn DailyView() -> Element {
+    // Hitung mundur harus berdetak — tick 1 detik seperti di widget.
+    let mut tick = use_signal(|| 0u64);
+    use_future(move || async move {
+        loop {
+            tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+            tick += 1;
+        }
+    });
+    let _ = tick();
+
+    let settings = state::settings();
+    let lang = settings.language;
+    let now = prayer::now_in_tz(&settings);
+    let tz = now.format("%Z").to_string();
+    let (hari, tanggal, tanggal_hijri) = tanggal_labels(lang, &now);
+
+    rsx! {
+        div { class: "flex-1 flex items-center justify-center p-4",
+            match prayer::day_times(&settings, now.date_naive()) {
+                Some(times) => rsx! {
+                    // Ukuran alami kartu widget; dibulatkan + diberi shadow
+                    // agar duduk sebagai kartu di atas lembar.
+                    div { class: "w-[600px] h-[300px] rounded-[14px] shadow-[0_8px_18px_#14161a1a] dark:shadow-[0_8px_18px_#00000080] overflow-hidden",
+                        Ticket {
+                            times: times,
+                            now: now.time(),
+                            tz: tz,
+                            hari: hari,
+                            tanggal: tanggal,
+                            tanggal_hijri: tanggal_hijri,
+                        }
+                    }
+                },
+                None => rsx! {
+                    div { class: "w-[600px] h-[300px] rounded-[14px] flex items-center justify-center bg-pass shadow-[0_8px_18px_#14161a1a] dark:shadow-[0_8px_18px_#00000080]",
+                        span { class: "text-sm text-ink-3", "{tr(lang, \"calc_failed\")}" }
+                    }
+                },
+            }
+        }
+    }
+}
 
 /// Root komponen widget window — dom terpisah dari window utama,
 /// state dibaca dari global `state::settings()` setiap tick.
@@ -45,14 +115,7 @@ pub fn WidgetApp() -> Element {
     let lang = settings.language;
     let dark = settings.theme.is_dark();
     let now = prayer::now_in_tz(&settings);
-    let hari = day_name(lang, now.weekday().num_days_from_monday() as usize).to_string();
-    let tanggal = format!(
-        "{} {} {}",
-        now.day(),
-        month_name(lang, (now.month() - 1) as usize),
-        now.year()
-    );
-    let tanggal_hijri = hijri::format(lang, now.date_naive());
+    let (hari, tanggal, tanggal_hijri) = tanggal_labels(lang, &now);
 
     let mut root_class =
         String::from("h-screen w-screen overflow-hidden select-none font-sans text-ink");

@@ -112,7 +112,8 @@ pub fn app() -> Element {
             match tab() {
                 Tab::Pengaturan => rsx! { settings_view::SettingsView {} },
                 Tab::Tentang => rsx! { about_view::AboutView {} },
-                Tab::Harian | Tab::Bulanan | Tab::Kalender => rsx! {
+                Tab::Harian => rsx! { widget::DailyView {} },
+                Tab::Bulanan | Tab::Kalender => rsx! {
                     div { class: "flex-1 flex items-center justify-center",
                         span { class: "font-mono text-xs font-semibold tracking-[0.14em] uppercase text-ink-3",
                             "{tr(lang, \"coming_soon\")}"
