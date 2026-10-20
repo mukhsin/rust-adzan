@@ -1,3 +1,4 @@
+pub mod about_view;
 pub mod icons;
 pub mod settings_view;
 pub mod widget;
@@ -110,7 +111,8 @@ pub fn app() -> Element {
             TitleBar { tab: *tab.read(), on_select_tab: move |t: Tab| tab.set(t) }
             match tab() {
                 Tab::Pengaturan => rsx! { settings_view::SettingsView {} },
-                Tab::Harian | Tab::Bulanan => rsx! {
+                Tab::Tentang => rsx! { about_view::AboutView {} },
+                Tab::Harian | Tab::Bulanan | Tab::Kalender => rsx! {
                     div { class: "flex-1 flex items-center justify-center",
                         span { class: "font-mono text-xs font-semibold tracking-[0.14em] uppercase text-ink-3",
                             "{tr(lang, \"coming_soon\")}"
@@ -122,13 +124,15 @@ pub fn app() -> Element {
     }
 }
 
-/// Tab aplikasi pada bar atas (design system pen). Layar Harian & Bulanan
-/// diimplement menyusul — lihat `Tab::Harian`/`Bulanan` di `app()`.
+/// Tab aplikasi pada bar atas (design system pen). Layar Harian, Bulanan,
+/// dan Kalender menyusul — lihat placeholder di `app()`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Tab {
     Harian,
     Bulanan,
+    Kalender,
     Pengaturan,
+    Tentang,
 }
 
 /// Bar atas window utama ala komponen "Bar Atas" di design system pen:
@@ -141,7 +145,9 @@ pub fn TitleBar(tab: Tab, on_select_tab: EventHandler<Tab>) -> Element {
     let tabs = [
         (Tab::Harian, tr(lang, "tab_daily")),
         (Tab::Bulanan, tr(lang, "tab_monthly")),
+        (Tab::Kalender, tr(lang, "tab_kalender")),
         (Tab::Pengaturan, tr(lang, "settings_title")),
+        (Tab::Tentang, tr(lang, "tab_tentang")),
     ];
 
     rsx! {

@@ -44,7 +44,6 @@ pub fn SettingsView() -> Element {
     let mut draft = use_signal(|| (*state::settings()).clone());
     let mut dialog = use_signal(|| Dialog::None);
     let lang = state::settings().language;
-    let versi = tr(lang, "version_label").replace("{versi}", env!("CARGO_PKG_VERSION"));
     // Status pemutaran per slot (di-poll berkala agar ikon play/stop akurat);
     // sinyalnya dipakai komponen AudioGroup.
     let mut playing_umum = use_signal(|| crate::audio::is_playing(crate::audio::Slot::Umum));
@@ -85,13 +84,14 @@ pub fn SettingsView() -> Element {
                 }
             }
 
-            div { class: "flex flex-col items-center gap-2 pt-1 pb-2",
+            // Reset dipindah ke sini dari footer lama; versi kini tampil di
+            // layar Tentang.
+            div { class: "flex items-center justify-center pt-1 pb-2",
                 button {
                     class: "px-3 py-2 rounded-lg text-[13px] font-semibold text-red-500 border border-pass-line hover:border-red-400 transition-colors cursor-pointer",
                     onclick: move |_| dialog.set(Dialog::ResetConfirm),
                     "{tr(lang, \"reset_btn\")}"
                 }
-                span { class: "font-mono text-[12.5px] text-ink-3 select-none", "{versi}" }
             }
 
             {match dialog.read().clone() {

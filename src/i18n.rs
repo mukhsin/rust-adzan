@@ -17,6 +17,8 @@ const PHRASES: &[(&str, &str, &str)] = &[
     ("settings_title", "Pengaturan", "Settings"),
     ("tab_daily", "Harian", "Daily"),
     ("tab_monthly", "Bulanan", "Monthly"),
+    ("tab_kalender", "Kalender", "Calendar"),
+    ("tab_tentang", "Tentang", "About"),
     ("coming_soon", "Belum tersedia", "Not available yet"),
     (
         "close_hint",
@@ -148,6 +150,27 @@ const PHRASES: &[(&str, &str, &str)] = &[
     ("fmt_12", "12 jam", "12-hour"),
     // Settings — lainnya
     ("sec_misc", "Lainnya", "Other"),
+    // Layar Tentang
+    (
+        "about_tagline",
+        "Pengingat jadwal sholat & adzan untuk Windows — 100% offline.",
+        "Prayer times & adhan reminder for Windows — 100% offline.",
+    ),
+    ("about_info", "Informasi", "Information"),
+    ("about_hijri", "Hijriah", "Hijri calendar"),
+    ("about_adzan", "Adzan", "Adhan"),
+    (
+        "about_adzan_value",
+        "Tersemat · bisa kustom",
+        "Embedded · customizable",
+    ),
+    ("about_source", "Sumber Kode", "Source code"),
+    ("about_astronomis", "Astronomis", "Astronomical"),
+    (
+        "about_built",
+        "Dibangun dengan Rust · Dioxus · Tailwind",
+        "Built with Rust · Dioxus · Tailwind",
+    ),
     ("f_language", "Bahasa", "Language"),
     (
         "f_autostart",
