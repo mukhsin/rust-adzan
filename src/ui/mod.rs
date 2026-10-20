@@ -31,6 +31,11 @@ pub(crate) const WIDGET_SIZE: (f64, f64) = (600.0, 300.0);
 
 pub fn app() -> Element {
     let mut theme = use_signal(|| state::settings().theme);
+    let lang = state::settings().language;
+    let tr = crate::i18n::tr;
+    // Tab aktif bar atas. Layar Harian & Bulanan menyusul — untuk kini
+    // keduanya menampilkan placeholder.
+    let mut tab = use_signal(|| Tab::Pengaturan);
 
     // Sinkronkan tema dari dom lain (mis. toggle di widget window) tiap detik.
     let mut sync_tick = use_signal(|| 0u64);
@@ -44,7 +49,6 @@ pub fn app() -> Element {
     if *theme.read() != state::settings().theme {
         theme.set(state::settings().theme);
     }
-    let lang = state::settings().language;
 
     // Perintah lintas window: tombol pengaturan di widget menampilkan window
     // utama. `dioxus::desktop::window()` di dom widget menunjuk widget, jadi
@@ -74,10 +78,26 @@ pub fn app() -> Element {
         show_widget();
     });
 
+    // Window utama 1200×800: posisikan di tengah monitor sekali saat startup
+    // (window masih tersembunyi), jadi saat dibuka ia sudah center. Pakai
+    // use_hook (sekali) — use_effect jalan tiap render dan akan menyentak
+    // window kembali ke tengah saat user sedang menggesernya.
+    use_hook(|| {
+        let win = dioxus::desktop::window();
+        let Some(monitor) = win.current_monitor() else {
+            return;
+        };
+        let mon_pos = monitor.position();
+        let mon_size = monitor.size();
+        let inner = win.inner_size();
+        let x = mon_pos.x + (mon_size.width as i32 - inner.width as i32) / 2;
+        let y = mon_pos.y + (mon_size.height as i32 - inner.height as i32) / 2;
+        win.set_outer_position(PhysicalPosition::new(x, y));
+    });
+
     let mut root_class = String::from(
         "h-screen w-screen flex flex-col overflow-hidden font-sans \
-         bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-50 \
-         transition-colors duration-300",
+         bg-sheet text-ink transition-colors duration-300",
     );
     if theme.read().is_dark() {
         root_class.push_str(" dark");
@@ -87,30 +107,100 @@ pub fn app() -> Element {
         style { {TAILWIND_CSS} }
         TraySetup {}
         div { class: "{root_class}",
-            TitleBar { title: crate::i18n::tr(lang, "settings_title") }
-            settings_view::SettingsView {}
+            TitleBar { tab: *tab.read(), on_select_tab: move |t: Tab| tab.set(t) }
+            match tab() {
+                Tab::Pengaturan => rsx! { settings_view::SettingsView {} },
+                Tab::Harian | Tab::Bulanan => rsx! {
+                    div { class: "flex-1 flex items-center justify-center",
+                        span { class: "font-mono text-xs font-semibold tracking-[0.14em] uppercase text-ink-3",
+                            "{tr(lang, \"coming_soon\")}"
+                        }
+                    }
+                },
+            }
         }
     }
 }
 
-/// Title bar minimal window pengaturan: judul + tombol tutup saja.
-/// Seluruh bar bisa dipakai drag window.
+/// Tab aplikasi pada bar atas (design system pen). Layar Harian & Bulanan
+/// diimplement menyusul — lihat `Tab::Harian`/`Bulanan` di `app()`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Tab {
+    Harian,
+    Bulanan,
+    Pengaturan,
+}
+
+/// Bar atas window utama ala komponen "Bar Atas" di design system pen:
+/// brand + tab kiri, kontrol jendela (minimize / maximize / close) kanan.
+/// Seluruh bar bisa dipakai drag window; tab & tombol tidak ikut drag.
 #[component]
-pub fn TitleBar(title: &'static str) -> Element {
+pub fn TitleBar(tab: Tab, on_select_tab: EventHandler<Tab>) -> Element {
     let lang = state::settings().language;
+    let tr = crate::i18n::tr;
+    let tabs = [
+        (Tab::Harian, tr(lang, "tab_daily")),
+        (Tab::Bulanan, tr(lang, "tab_monthly")),
+        (Tab::Pengaturan, tr(lang, "settings_title")),
+    ];
+
     rsx! {
         div {
-            class: "h-10 shrink-0 flex items-center justify-between px-3 select-none cursor-default bg-zinc-50 dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800 transition-colors duration-300",
+            class: "shrink-0 flex items-center gap-6 p-2 select-none cursor-default",
             onmousedown: move |_| { dioxus::desktop::window().drag(); },
 
-            span { class: "text-xs font-medium text-zinc-600 dark:text-zinc-300", "{title}" }
+            div { class: "flex items-center gap-2.5 px-4",
+                icons::Mosque { class: "w-[22px] h-[22px] text-ink" }
+                span { class: "text-base font-bold tracking-wide text-ink", "Jadwal Sholat" }
+            }
 
-            button {
-                class: "p-1.5 rounded-md hover:bg-red-500 hover:text-white dark:hover:bg-red-500 dark:hover:text-white text-zinc-500 dark:text-zinc-400 transition-colors",
-                title: crate::i18n::tr(lang, "close_hint"),
-                onmousedown: move |e| e.stop_propagation(),
-                onclick: move |_| dioxus::desktop::window().set_visible(false),
-                icons::IconClose { class: "w-3.5 h-3.5" }
+            div { class: "flex items-center gap-4",
+                for (t, label) in tabs {
+                    {
+                        let active = t == tab;
+                        rsx! {
+                            button {
+                                class: if active {
+                                    "flex flex-col gap-[5px] px-2 py-1.5 border-b-[2.5px] border-ink text-[13.5px] font-bold text-ink cursor-pointer"
+                                } else {
+                                    "flex flex-col gap-[5px] px-2 py-1.5 border-b-[2.5px] border-transparent text-[13.5px] font-semibold text-ink-2 hover:text-ink transition-colors cursor-pointer"
+                                },
+                                onmousedown: move |e| e.stop_propagation(),
+                                onclick: move |_| on_select_tab.call(t),
+                                "{label}"
+                            }
+                        }
+                    }
+                }
+            }
+
+            div { class: "flex-1" }
+
+            div { class: "flex items-center gap-0.5",
+                button {
+                    class: "w-[42px] h-[42px] flex items-center justify-center rounded-lg text-ink-2 hover:bg-ink/5 transition-colors cursor-pointer",
+                    title: tr(lang, "win_minimize"),
+                    onmousedown: move |e| e.stop_propagation(),
+                    onclick: move |_| dioxus::desktop::window().set_minimized(true),
+                    icons::IconMinus { class: "w-[15px] h-[15px]" }
+                }
+                button {
+                    class: "w-[42px] h-[42px] flex items-center justify-center rounded-lg text-ink-2 hover:bg-ink/5 transition-colors cursor-pointer",
+                    title: tr(lang, "win_maximize"),
+                    onmousedown: move |e| e.stop_propagation(),
+                    onclick: move |_| {
+                        let win = dioxus::desktop::window();
+                        win.set_maximized(!win.is_maximized());
+                    },
+                    icons::IconSquare { class: "w-3 h-3" }
+                }
+                button {
+                    class: "w-[42px] h-[42px] flex items-center justify-center rounded-lg text-ink-2 hover:bg-red-500 hover:text-white transition-colors cursor-pointer",
+                    title: tr(lang, "close_hint"),
+                    onmousedown: move |e| e.stop_propagation(),
+                    onclick: move |_| dioxus::desktop::window().set_visible(false),
+                    icons::IconClose { class: "w-[15px] h-[15px]" }
+                }
             }
         }
     }

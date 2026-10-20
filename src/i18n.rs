@@ -15,6 +15,9 @@ const PHRASES: &[(&str, &str, &str)] = &[
     // Umum / widget
     ("app_name", "Jadwal Sholat", "Prayer Times"),
     ("settings_title", "Pengaturan", "Settings"),
+    ("tab_daily", "Harian", "Daily"),
+    ("tab_monthly", "Bulanan", "Monthly"),
+    ("coming_soon", "Belum tersedia", "Not available yet"),
     (
         "close_hint",
         "Tutup (tetap berjalan di tray)",
@@ -29,6 +32,9 @@ const PHRASES: &[(&str, &str, &str)] = &[
         "Failed to calculate the schedule.",
     ),
     ("countdown_prefix", "Menuju", "Until"),
+    ("unit_minutes", "menit", "min"),
+    ("win_minimize", "Minimalkan", "Minimize"),
+    ("win_maximize", "Maksimalkan", "Maximize"),
     // Kartu tiket widget
     ("masuk_pukul", "— masuk pukul {waktu}", "— at {waktu}"),
     // Nama baris jadwal (termasuk sholat wajib, lihat PrayerKind::key)
@@ -110,6 +116,11 @@ const PHRASES: &[(&str, &str, &str)] = &[
     // Settings — notifikasi
     ("sec_notif", "Notifikasi", "Notifications"),
     (
+        "hint_notif_toast",
+        "toast saat waktu masuk",
+        "toast when prayer time starts",
+    ),
+    (
         "f_notif_enabled",
         "Tampilkan toast notifikasi",
         "Show toast notifications",
@@ -126,6 +137,15 @@ const PHRASES: &[(&str, &str, &str)] = &[
     ),
     ("dec", "Kurangi", "Decrease"),
     ("inc", "Tambah", "Increase"),
+    // Settings — tampilan
+    ("sec_appearance", "Tampilan", "Appearance"),
+    ("f_theme", "Tema", "Theme"),
+    ("theme_system", "Sistem", "System"),
+    ("theme_dark", "Gelap", "Dark"),
+    ("theme_light", "Terang", "Light"),
+    ("f_time_format", "Format waktu", "Time format"),
+    ("fmt_24", "24 jam", "24-hour"),
+    ("fmt_12", "12 jam", "12-hour"),
     // Settings — lainnya
     ("sec_misc", "Lainnya", "Other"),
     ("f_language", "Bahasa", "Language"),

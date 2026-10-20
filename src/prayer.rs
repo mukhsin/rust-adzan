@@ -157,8 +157,13 @@ pub fn format_countdown(d: Duration) -> String {
     )
 }
 
-pub fn format_time(t: NaiveTime) -> String {
-    t.format("%H:%M").to_string()
+/// Format jam sesuai setting: 24 jam ("04:11") atau 12 jam ("4:11 AM").
+pub fn format_time(t: NaiveTime, h24: bool) -> String {
+    if h24 {
+        t.format("%H:%M").to_string()
+    } else {
+        t.format("%-I:%M %p").to_string()
+    }
 }
 
 /// Waktu "sekarang" dalam zona waktu kota.
@@ -198,6 +203,15 @@ mod tests {
 
     fn jakarta() -> Settings {
         Settings::default() // default = Jakarta, Kemenag
+    }
+
+    #[test]
+    fn format_time_24_dan_12_jam() {
+        let sore = NaiveTime::from_hms_opt(16, 5, 0).unwrap();
+        assert_eq!(format_time(sore, true), "16:05");
+        assert_eq!(format_time(sore, false), "4:05 PM");
+        let dini_hari = NaiveTime::from_hms_opt(0, 11, 0).unwrap();
+        assert_eq!(format_time(dini_hari, false), "12:11 AM");
     }
 
     // Referensi kalibrasi: Aladhan API method=20 (Kemenag) untuk Jakarta

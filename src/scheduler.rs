@@ -157,8 +157,7 @@ fn execute(action: Action, settings: &Settings) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::prayer::DayTimes;
-    use chrono::{NaiveTime, TimeZone};
+    use chrono::TimeZone;
 
     fn settings_dengan_jadwal() -> Settings {
         Settings::default() // Jakarta, Kemenag, audio+notif aktif, pre 10 menit

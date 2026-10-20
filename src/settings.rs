@@ -26,18 +26,35 @@ pub enum MadhabChoice {
     Hanafi,
 }
 
-/// Tema UI.
+/// Tema UI. `System` mengikuti mode (gelap/terang) Windows.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub enum Theme {
     #[default]
+    System,
     Dark,
     Light,
 }
 
 impl Theme {
     pub fn is_dark(&self) -> bool {
-        *self == Theme::Dark
+        match self {
+            Theme::Dark => true,
+            Theme::Light => false,
+            Theme::System => sistem_gelap(),
+        }
     }
+}
+
+/// Mode gelap Windows saat ini (AppsUseLightTheme = 0 berarti gelap).
+/// Baca registry tiap panggilan — murah, dan tema bisa berubah kapan pun.
+fn sistem_gelap() -> bool {
+    use winreg::enums::HKEY_CURRENT_USER;
+    winreg::RegKey::predef(HKEY_CURRENT_USER)
+        .open_subkey("Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize")
+        .and_then(|k| k.get_value::<u32, _>("AppsUseLightTheme"))
+        .map(|light| light == 0)
+        // Gagal baca (registry tak ada / non-Windows) → ikuti default app (gelap).
+        .unwrap_or(true)
 }
 
 /// Bahasa UI aplikasi.
@@ -75,6 +92,8 @@ pub struct Settings {
 
     pub autostart: bool,
     pub theme: Theme,
+    /// Format jam tampilan: `true` = 24 jam, `false` = 12 jam (AM/PM).
+    pub time_format_24: bool,
     pub language: Language,
     /// Sholat yang adzannya di-mute (icon bell-off di daftar jadwal):
     /// tidak ada pemutaran audio, notifikasi tetap jalan.
@@ -98,7 +117,8 @@ impl Default for Settings {
             notif_enabled: true,
             pre_notif_minutes: 10,
             autostart: false,
-            theme: Theme::Dark,
+            theme: Theme::System,
+            time_format_24: true,
             language: Language::Id,
             muted_prayers: Vec::new(),
         }

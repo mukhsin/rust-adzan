@@ -116,7 +116,11 @@ fn Ticket(
         .city
         .clone()
         .unwrap_or_else(|| "Manual".to_string());
-    let jam_target = format!("{} {}", prayer::format_time(target), tz);
+    let jam_target = format!(
+        "{} {}",
+        prayer::format_time(target, settings.time_format_24),
+        tz
+    );
     let menuju = format!("{} {}", tr(lang, "countdown_prefix"), next_kind.nama(lang));
     let masuk = tr(lang, "masuk_pukul").replace("{waktu}", &jam_target);
 
@@ -299,7 +303,7 @@ fn Board(times: DayTimes, now: NaiveTime, next_kind: PrayerKind) -> Element {
                                     if let Some(kind) = row.kind {
                                         BellRow { kind: kind, color: bell_color, nama: nama, muted: muted }
                                     }
-                                    span { class: "{time_class}", "{prayer::format_time(row.time)}" }
+                                    span { class: "{time_class}", "{prayer::format_time(row.time, settings.time_format_24)}" }
                                 }
                             }
                         }
