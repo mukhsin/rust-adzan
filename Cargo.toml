@@ -9,6 +9,7 @@ chrono-tz = "0.10.4"
 dioxus = { version = "0.7.10", features = ["desktop"] }
 dioxus-icons = "0.1.0"
 dirs = "7.0.0"
+icu_calendar = "2.3.0"
 image = { version = "0.25.10", default-features = false, features = ["png"] }
 rfd = "0.15.4"
 rodio = "0.23.0"
@@ -22,6 +23,7 @@ winreg = "0.56.0"
 [target.'cfg(windows)'.dependencies]
 windows = { version = "0.61", features = [
     "Win32_Foundation",
+    "Win32_Graphics_Dwm",
     "Win32_UI_Input_KeyboardAndMouse",
 ] }
 

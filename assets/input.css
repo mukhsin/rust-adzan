@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "./fonts.css";
 
 /* Dark mode berbasis class (toggle di title bar), bukan prefers-color-scheme. */
 @custom-variant dark (&:where(.dark, .dark *));
@@ -6,12 +7,77 @@
 /* Kelas Tailwind dipindai dari source rsx. */
 @source "../src/**/*.rs";
 
+/* Font aplikasi — identitas desain (Open Sans untuk UI, Martian Mono untuk
+   angka & label). File font ter-embed lewat fonts.css. */
+@theme {
+  --font-sans: "Open Sans", "Segoe UI", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "Martian Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+  /* Font khusus hitung mundur besar di widget. */
+  --font-count: "Roboto Condensed", "Segoe UI", ui-sans-serif, sans-serif;
+}
+
+/* Token warna desain (dari design system "Jadwal Sholat Impeccable.pen").
+   Nilainya berpasangan terang/gelap via variabel CSS — kelas seperti
+   bg-pass / text-ink-3 otomatis mengikuti tema tanpa prefix dark:. */
+:root {
+  --c-pass: #ffffff;
+  --c-pass-line: #e2ddd1;
+  --c-ink: #14161a;
+  --c-ink-2: #5c584e;
+  --c-ink-3: #8a8578;
+  --c-board-text: #26221c;
+  --c-amber: #e0a63c;
+  --c-amber-ink: #14161a;
+  --c-hairline: #efeadf;
+}
+.dark {
+  --c-pass: #202227;
+  --c-pass-line: #2e3138;
+  --c-ink: #ece9e2;
+  --c-ink-2: #a8a294;
+  --c-ink-3: #7d7869;
+  --c-board-text: #b9bec7;
+  --c-amber: #e0a63c;
+  --c-amber-ink: #14161a;
+  --c-hairline: #26282e;
+}
+@theme inline {
+  --color-pass: var(--c-pass);
+  --color-pass-line: var(--c-pass-line);
+  --color-ink: var(--c-ink);
+  --color-ink-2: var(--c-ink-2);
+  --color-ink-3: var(--c-ink-3);
+  --color-board-text: var(--c-board-text);
+  --color-amber: var(--c-amber);
+  --color-amber-ink: var(--c-amber-ink);
+  --color-hairline: var(--c-hairline);
+}
+
 html,
 body {
   margin: 0;
   padding: 0;
   height: 100%;
   overflow: hidden;
+  /* Widget window transparan — lubang tiket bolong ke desktop. */
+  background: transparent;
+}
+
+/* Lubang perforasi di atas & bawah kartu (teknik mask: dua gradien radial,
+   masing-masing setengah tinggi elemen, memotong lingkaran transparan di
+   titik temu garis titik dengan tepi tiket). Pusat lingkaran sengaja 11px
+   dari tepi — baris paling luar window dirender WebView2 sebagai gelap
+   (artefak seam komposisi), jadi lubang dibuat penuh di dalam kartu dengan
+   rim kartu 2px menutupi baris itu. */
+.widget-holes {
+  -webkit-mask-image: radial-gradient(circle at 50% 24px, transparent 8px, black 9px), radial-gradient(circle at 50% calc(100% - 24px), transparent 8px, black 9px);
+  mask-image: radial-gradient(circle at 50% 24px, transparent 8px, black 9px), radial-gradient(circle at 50% calc(100% - 24px), transparent 8px, black 9px);
+  -webkit-mask-size: 100% 51%;
+  mask-size: 100% 51%;
+  -webkit-mask-position: top, bottom;
+  mask-position: top, bottom;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
 }
 
 /* Scrollbar tipis untuk daftar jadwal & settings. */

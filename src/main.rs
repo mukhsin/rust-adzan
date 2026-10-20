@@ -5,6 +5,7 @@
 mod audio;
 mod autostart;
 mod cities;
+mod hijri;
 mod i18n;
 mod logger;
 mod notify;

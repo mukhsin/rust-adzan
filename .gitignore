@@ -1,5 +1,7 @@
 /target
 /dist
+/pencil
+/sample
 /.dx
 /.zcode
 node_modules/

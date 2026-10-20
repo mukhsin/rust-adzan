@@ -1,5 +1,4 @@
 pub mod icons;
-pub mod schedule;
 pub mod settings_view;
 pub mod widget;
 
@@ -11,7 +10,7 @@ use dioxus::desktop::use_tray_icon_event_handler;
 use dioxus::desktop::{
     Config, WindowBuilder,
     tao::dpi::{LogicalSize, PhysicalPosition},
-    tao::platform::windows::WindowBuilderExtWindows,
+    tao::platform::windows::{WindowBuilderExtWindows, WindowExtWindows},
     tao::window::Window,
 };
 use dioxus::prelude::*;
@@ -24,13 +23,11 @@ pub static WINDOW_ICON_RGBA: &[u8] = include_bytes!("../../assets/icon.rgba");
 /// Data piksel RGBA (32×32) untuk tray icon.
 pub static TRAY_ICON_RGBA: &[u8] = include_bytes!("../../assets/icon-tray.rgba");
 
-/// Margin widget dari tepi monitor (px logical) — dipakai saat posisi default,
-/// clamp saat drag, dan setelah ganti ukuran.
+/// Margin widget dari tepi monitor (px logical) — dipakai saat posisi default
+/// dan clamp saat drag.
 pub(crate) const WIDGET_MARGIN: f64 = 16.0;
-/// Ukuran widget (px logical): kecil (hanya header) dan besar (header + daftar
-/// jadwal). Lebar keduanya sama — mode besar hanya bertambah tinggi.
-pub(crate) const WIDGET_SIZE_SMALL: (f64, f64) = (300.0, 280.0);
-pub(crate) const WIDGET_SIZE_LARGE: (f64, f64) = (300.0, 500.0);
+/// Ukuran window widget (px logical) — window = kartu tiket, tanpa gap.
+pub(crate) const WIDGET_SIZE: (f64, f64) = (600.0, 300.0);
 
 pub fn app() -> Element {
     let mut theme = use_signal(|| state::settings().theme);
@@ -237,12 +234,18 @@ fn sync_tray_language(lang: crate::settings::Language) {
 fn spawn_widget_creation() {
     spawn(async move {
         let main_win = dioxus::desktop::window();
-        let (w, h) = WIDGET_SIZE_SMALL;
+        let (w, h) = WIDGET_SIZE;
         let mut builder = WindowBuilder::new()
             .with_decorations(false)
             .with_resizable(false)
             .with_skip_taskbar(true)
             .with_visible(false)
+            // Transparan: lubang perforasi (mask CSS) benar-benar "bolong"
+            // ke desktop. Tanpa redirection bitmap, permukaan putih window
+            // tidak menutupi piksel transparan webview. Kartu mengisi window
+            // penuh — tidak ada margin.
+            .with_transparent(true)
+            .with_no_redirection_bitmap(true)
             .with_inner_size(LogicalSize::new(w, h));
 
         // Posisi default: pojok kanan-atas monitor, margin WIDGET_MARGIN.
@@ -309,17 +312,40 @@ pub(crate) fn clamp_widget_position(window: &Window) {
     }
 }
 
-/// Ganti ukuran widget kecil/besar lalu re-clamp posisinya (ukuran besar bisa
-/// meluber keluar monitor kalau widget sedang nempel di tepi kanan/bawah).
-pub(crate) fn apply_widget_size(window: &Window, large: bool) {
-    let (w, h) = if large {
-        WIDGET_SIZE_LARGE
-    } else {
-        WIDGET_SIZE_SMALL
+/// Rapikan frame window widget via DWM. SENGAJA TIDAK DIPAKAI: percobaan
+/// DWMWCP_ROUND + DWMWA_BORDER_COLOR ternyata menyisakan garis gelap 1px di
+/// tepi window yang terlihat menembus lubang perforasi. Dengan window
+/// transparan + redirection bitmap mati, sudut membulat cukup dari CSS
+/// (`rounded-[14px]` di kartu) dan DWM tidak menyentuh window sama sekali.
+#[allow(dead_code)]
+#[cfg(windows)]
+fn round_widget_window(window: &Window) {
+    use windows::Win32::Foundation::HWND;
+    use windows::Win32::Graphics::Dwm::{
+        DWMWA_BORDER_COLOR, DWMWA_WINDOW_CORNER_PREFERENCE, DWMWCP_ROUND, DwmSetWindowAttribute,
     };
-    window.set_inner_size(LogicalSize::new(w, h));
-    clamp_widget_position(window);
+    let hwnd = HWND(window.hwnd() as *mut _);
+    let pref = DWMWCP_ROUND.0 as u32;
+    // Warna border alpha-0 (0x00000000) = tanpa border.
+    let no_border: u32 = 0;
+    unsafe {
+        let _ = DwmSetWindowAttribute(
+            hwnd,
+            DWMWA_WINDOW_CORNER_PREFERENCE,
+            &pref as *const u32 as *const _,
+            std::mem::size_of::<u32>() as _,
+        );
+        let _ = DwmSetWindowAttribute(
+            hwnd,
+            DWMWA_BORDER_COLOR,
+            &no_border as *const u32 as *const _,
+            std::mem::size_of::<u32>() as _,
+        );
+    }
 }
+
+#[cfg(not(windows))]
+fn round_widget_window(_window: &Window) {}
 
 /// Pantau tombol kiri mouse selama drag native widget berjalan; begitu
 /// dilepas, snap posisi widget ke margin 16px semua sisi. Diperlukan karena

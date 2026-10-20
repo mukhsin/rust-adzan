@@ -23,20 +23,14 @@ const PHRASES: &[(&str, &str, &str)] = &[
     ("menu_show", "Tampilkan Jendela", "Show Window"),
     ("menu_widget", "Widget Desktop", "Desktop Widget"),
     ("menu_quit", "Keluar", "Quit"),
-    ("toggle_theme", "Ganti tema", "Toggle theme"),
-    ("open_settings", "Buka Pengaturan", "Open settings"),
-    ("shrink_widget", "Perkecil widget", "Shrink widget"),
-    (
-        "expand_widget",
-        "Tampilkan jadwal lengkap",
-        "Show full schedule",
-    ),
     (
         "calc_failed",
         "Gagal menghitung jadwal.",
         "Failed to calculate the schedule.",
     ),
     ("countdown_prefix", "Menuju", "Until"),
+    // Kartu tiket widget
+    ("masuk_pukul", "— masuk pukul {waktu}", "— at {waktu}"),
     // Nama baris jadwal (termasuk sholat wajib, lihat PrayerKind::key)
     ("imsak", "Imsak", "Imsak"),
     ("subuh", "Subuh", "Fajr"),
@@ -216,6 +210,42 @@ pub fn day_name(lang: Language, idx: usize) -> &'static str {
     }
 }
 
+/// Nama bulan hijri, indeks 0 = Muharam.
+pub fn hijri_month_name(lang: Language, idx: usize) -> &'static str {
+    const ID: [&str; 12] = [
+        "Muharam",
+        "Safar",
+        "Rabiul Awal",
+        "Rabiul Akhir",
+        "Jumadil Awal",
+        "Jumadil Akhir",
+        "Rajab",
+        "Sya'ban",
+        "Ramadhan",
+        "Syawal",
+        "Zulkaidah",
+        "Zulhijah",
+    ];
+    const EN: [&str; 12] = [
+        "Muharram",
+        "Safar",
+        "Rabi' al-Awwal",
+        "Rabi' al-Thani",
+        "Jumada al-Ula",
+        "Jumada al-Akhirah",
+        "Rajab",
+        "Sha'ban",
+        "Ramadan",
+        "Shawwal",
+        "Dhu al-Qi'dah",
+        "Dhu al-Hijjah",
+    ];
+    match lang {
+        Language::Id => ID[idx],
+        Language::En => EN[idx],
+    }
+}
+
 /// Nama bulan, indeks 0 = Januari.
 pub fn month_name(lang: Language, idx: usize) -> &'static str {
     const ID: [&str; 12] = [
@@ -275,5 +305,7 @@ mod tests {
         assert_eq!(day_name(Language::En, 6), "Sunday");
         assert_eq!(month_name(Language::Id, 0), "Januari");
         assert_eq!(month_name(Language::En, 11), "December");
+        assert_eq!(hijri_month_name(Language::Id, 0), "Muharam");
+        assert_eq!(hijri_month_name(Language::En, 4), "Jumada al-Ula");
     }
 }

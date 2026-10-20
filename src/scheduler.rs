@@ -61,19 +61,23 @@ pub fn tick(state: &mut EngineState, settings: &Settings, now: DateTime<Tz>) -> 
         // Trigger adzan: baru saja masuk waktu (0..=2s) dan belum diputar.
         if !state.played.contains(&kind) && elapsed >= Duration::zero() && elapsed <= tolerance {
             state.played.insert(kind);
-            // Sholat yang di-mute (bell-off di daftar jadwal) tidak memutar
-            // audio, notifikasi tetap dikirim.
+            // Sholat yang di-mute (bell-off di papan jadwal widget): seluruh
+            // jadwal adzannya diam — tanpa audio, tanpa toast masuk waktu.
             let muted = settings.muted_prayers.contains(&kind);
             if settings.audio_enabled && !muted {
                 actions.push(Action::PlayAdzan(kind));
             }
-            if settings.notif_enabled {
+            if settings.notif_enabled && !muted {
                 actions.push(Action::NotifyAdzan(kind));
             }
         }
 
-        // Pengingat X menit sebelum adzan.
-        if settings.notif_enabled && settings.pre_notif_minutes > 0 {
+        // Pengingat X menit sebelum adzan — tidak dikirim untuk sholat yang
+        // di-mute (adzannya memang tidak akan dibunyikan).
+        if settings.notif_enabled
+            && settings.pre_notif_minutes > 0
+            && !settings.muted_prayers.contains(&kind)
+        {
             let pre_secs = settings.pre_notif_minutes as i64 * 60;
             let pre_target = target.num_seconds_from_midnight() as i64 - pre_secs;
             if pre_target >= 0 {
@@ -285,14 +289,31 @@ mod tests {
     }
 
     #[test]
-    fn sholat_dimute_tidak_mainkan_adzan() {
-        // Bell-off pada satu sholat: audio diam, notifikasi tetap jalan,
-        // sholat lain tidak terpengaruh.
+    fn sholat_dimute_tanpa_adzan_dan_notifikasi() {
+        // Bell-off pada satu sholat: seluruh jadwal adzannya diam — tanpa
+        // audio, tanpa toast masuk waktu, tanpa pengingat sebelum adzan.
+        // Sholat lain tidak terpengaruh.
         let mut s = settings_dengan_jadwal();
         s.muted_prayers = vec![PrayerKind::Subuh];
         let mut state = EngineState::new();
         let date = (2026, 10, 15);
         let times = day_times(&s, NaiveDate::from_ymd_opt(2026, 10, 15).unwrap()).unwrap();
+
+        // Pengingat sebelum Subuh juga tidak boleh muncul.
+        let pre_secs = s.pre_notif_minutes as i64 * 60;
+        let pre = times.subuh - chrono::Duration::seconds(pre_secs);
+        let now = fake_now(s.timezone(), date, (pre.hour(), pre.minute(), 0));
+        let actions = tick(&mut state, &s, now);
+        assert!(
+            !actions.iter().any(|a| matches!(
+                a,
+                Action::NotifyPre {
+                    kind: PrayerKind::Subuh,
+                    ..
+                }
+            )),
+            "Subuh di-mute, pengingat sebelum adzan tidak boleh muncul: {actions:?}"
+        );
 
         let now = fake_now(
             s.timezone(),
@@ -304,7 +325,10 @@ mod tests {
             !actions.iter().any(|a| matches!(a, Action::PlayAdzan(_))),
             "adzan Subuh di-mute, tidak boleh PlayAdzan: {actions:?}"
         );
-        assert!(actions.contains(&Action::NotifyAdzan(PrayerKind::Subuh)));
+        assert!(
+            !actions.contains(&Action::NotifyAdzan(PrayerKind::Subuh)),
+            "Subuh di-mute, toast masuk waktu tidak boleh muncul: {actions:?}"
+        );
 
         // Maghrib (tidak di-mute) tetap memutar adzan.
         let now = fake_now(

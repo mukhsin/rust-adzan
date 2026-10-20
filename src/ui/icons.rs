@@ -8,10 +8,8 @@
 use dioxus::prelude::*;
 
 pub use dioxus_icons::lucide::{
-    Bell as IconBell, BellOff as IconBellOff, Calendar as IconCalendar, MapPin as IconMapPin,
-    Maximize2 as IconMaximize2, Minimize2 as IconMinimize2, Minus as IconMinus, Moon as IconMoon,
-    Play as IconPlay, Plus as IconPlus, Settings as IconSettings, Square as IconSquare,
-    Sun as IconSun, X as IconClose,
+    Bell as IconBell, BellOff as IconBellOff, Minus as IconMinus, Play as IconPlay,
+    Plus as IconPlus, Square as IconSquare, X as IconClose,
 };
 
 /// Ikon mosque — geometri persis `assets/mosque.svg` (desain multicolor),
