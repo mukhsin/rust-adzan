@@ -142,6 +142,18 @@ const PHRASES: &[(&str, &str, &str)] = &[
         "Menit sebelum waktu masuk",
         "Minutes before prayer time",
     ),
+    ("f_imsak_notif", "Notifikasi imsak", "Imsak notification"),
+    (
+        "hint_imsak_notif",
+        "toast saat masuk waktu imsak",
+        "toast when imsak time starts",
+    ),
+    // Settings — koreksi waktu per sholat
+    (
+        "offset_hint",
+        "waktu bawaan {waktu}",
+        "default time {waktu}",
+    ),
     ("dec", "Kurangi", "Decrease"),
     ("inc", "Tambah", "Increase"),
     // Settings — tampilan
@@ -223,6 +235,51 @@ const PHRASES: &[(&str, &str, &str)] = &[
         "notif_pre_body",
         "{minutes} menit lagi masuk waktu sholat {nama}.",
         "{nama} in {minutes} minutes.",
+    ),
+    ("notif_imsak_title", "Masuk waktu imsak", "It's imsak time"),
+    (
+        "notif_imsak_body",
+        "Telah masuk waktu imsak — bersiap menuju waktu Subuh. 🌙",
+        "Imsak has started — Fajr is coming up soon. 🌙",
+    ),
+    // Pembaruan (toast + settings)
+    ("f_update_check", "Periksa pembaruan", "Update check"),
+    (
+        "hint_update_check",
+        "cek rilis baru di GitHub secara otomatis",
+        "automatically check GitHub for new releases",
+    ),
+    (
+        "update_check_row",
+        "Cek pembaruan manual",
+        "Manual update check",
+    ),
+    ("update_check_btn", "Cek sekarang", "Check now"),
+    ("update_title", "Pembaruan tersedia", "Update available"),
+    (
+        "update_body",
+        "Jadwal Sholat {versi} sudah rilis — klik untuk mengunduh.",
+        "Jadwal Sholat {versi} is out — click to download.",
+    ),
+    (
+        "update_latest_title",
+        "Versi sudah terbaru",
+        "You're up to date",
+    ),
+    (
+        "update_latest_body",
+        "Kamu memakai versi terbaru, v{versi}.",
+        "You're on the latest version, v{versi}.",
+    ),
+    (
+        "update_failed_title",
+        "Gagal memeriksa pembaruan",
+        "Update check failed",
+    ),
+    (
+        "update_failed_body",
+        "Tidak bisa menghubungi GitHub — periksa koneksi internet.",
+        "Could not reach GitHub — check your internet connection.",
     ),
 ];
 
@@ -340,6 +397,8 @@ mod tests {
         assert_eq!(tr(Language::En, "app_name"), "Prayer Times");
         assert_eq!(tr(Language::Id, "subuh"), "Subuh");
         assert_eq!(tr(Language::En, "subuh"), "Fajr");
+        assert!(tr(Language::En, "update_title").len() > 0);
+        assert!(tr(Language::Id, "notif_imsak_title").len() > 0);
     }
 
     #[test]

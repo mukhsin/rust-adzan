@@ -16,6 +16,7 @@ mod scheduler;
 mod screens;
 mod settings;
 mod state;
+mod update;
 
 use dioxus::desktop::{Config, WindowBuilder, WindowCloseBehaviour, tao::dpi::LogicalSize};
 
@@ -27,6 +28,7 @@ fn main() {
     // Identitas toast (AUMID): supaya notifikasi memakai nama + ikon aplikasi.
     notify::ensure_aumid_registered();
     scheduler::start();
+    update::start();
     logger::info("aplikasi dimulai");
 
     // Sinkronkan auto-start dengan settings (memperbarui path exe yang bisa usang).

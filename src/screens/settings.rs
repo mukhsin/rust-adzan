@@ -11,7 +11,7 @@ use crate::components::ui::group::{Group, Row};
 use crate::components::ui::icons;
 use crate::components::ui::modal::Modal;
 use crate::components::ui::segmented::Segmented;
-use crate::components::ui::stepper::Stepper;
+use crate::components::ui::stepper::{OffsetStepper, Stepper};
 use crate::components::ui::switch::Switch;
 use crate::i18n::tr;
 use crate::settings::{CalcMethod, Language, MadhabChoice, Settings, Theme};
@@ -67,12 +67,12 @@ pub fn SettingsView() -> Element {
             div { class: "flex items-start gap-[18px]",
                 div { class: "flex-1 flex flex-col gap-[18px]",
                     LocationGroup { draft }
-                    CalculationGroup { draft }
-                    AppearanceGroup { draft }
-                }
-                div { class: "flex-1 flex flex-col gap-[18px]",
                     AudioGroup { draft, playing_umum, playing_subuh }
                     NotificationGroup { draft }
+                    // AppearanceGroup { draft }
+                }
+                div { class: "flex-1 flex flex-col gap-[18px]",
+                    CalculationGroup { draft }
                     MiscGroup { draft,
                         on_autostart_error: move |err: String| dialog.set(Dialog::AutostartError(err)),
                     }
@@ -212,10 +212,27 @@ fn LocationGroup(draft: Signal<Settings>) -> Element {
     }
 }
 
-/// Grup PERHITUNGAN: metode perhitungan + mazhab ashar.
+/// Grup PERHITUNGAN: metode perhitungan, mazhab ashar, dan koreksi waktu
+/// per sholat (±30 menit — selaraskan jadwal dengan masjid setempat).
 #[component]
 fn CalculationGroup(draft: Signal<Settings>) -> Element {
     let lang = state::settings().language;
+
+    // Jadwal TANPA koreksi — sumber hint "waktu bawaan" di baris yang
+    // offset-nya ≠ 0. Dihitung sekali per render grup.
+    let mut dasar = (*state::settings()).clone();
+    dasar.prayer_offsets.clear();
+    let dasar_times =
+        crate::prayer::day_times(&dasar, crate::prayer::now_in_tz(&dasar).date_naive());
+
+    // Baris koreksi: (kunci nama, sholat).
+    const BARIS_KOREKSI: [(&str, crate::prayer::PrayerKind); 5] = [
+        ("subuh", crate::prayer::PrayerKind::Subuh),
+        ("dzuhur", crate::prayer::PrayerKind::Dzuhur),
+        ("ashar", crate::prayer::PrayerKind::Ashar),
+        ("maghrib", crate::prayer::PrayerKind::Maghrib),
+        ("isya", crate::prayer::PrayerKind::Isya),
+    ];
 
     rsx! {
         Group { label: tr(lang, "sec_calc"),
@@ -254,6 +271,45 @@ fn CalculationGroup(draft: Signal<Settings>) -> Element {
                     },
                     option { value: "shafi", "{tr(lang, \"madhab_shafi\")}" }
                     option { value: "hanafi", "{tr(lang, \"madhab_hanafi\")}" }
+                }
+            }
+            for (key, kind) in BARIS_KOREKSI {
+                {
+                    let offset = draft.read().offset_of(kind);
+                    // Hint hanya saat dikoreksi: tampilkan jadwal bawaan agar
+                    // user tahu titik nolnya.
+                    let hint = if offset != 0 {
+                        dasar_times.map(|t| {
+                            tr(lang, "offset_hint").replace(
+                                "{waktu}",
+                                &crate::prayer::format_time(t.waktu(kind), draft.read().time_format_24),
+                            )
+                        })
+                    } else {
+                        None
+                    };
+                    rsx! {
+                        Row { label: tr(lang, key), hint: hint,
+                            OffsetStepper {
+                                value: offset,
+                                on_decrease: move |_| {
+                                    let mut s = draft.read().clone();
+                                    let next = (s.offset_of(kind) - 1).max(-30);
+                                    // 0 disimpan sebagai tanpa-entri agar config tetap ramping.
+                                    if next == 0 { s.prayer_offsets.remove(&kind); }
+                                    else { s.prayer_offsets.insert(kind, next); }
+                                    apply_settings(draft, s);
+                                },
+                                on_increase: move |_| {
+                                    let mut s = draft.read().clone();
+                                    let next = (s.offset_of(kind) + 1).min(30);
+                                    if next == 0 { s.prayer_offsets.remove(&kind); }
+                                    else { s.prayer_offsets.insert(kind, next); }
+                                    apply_settings(draft, s);
+                                },
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -407,6 +463,16 @@ fn NotificationGroup(draft: Signal<Settings>) -> Element {
                     },
                 }
             }
+            Row { label: tr(lang, "f_imsak_notif"), hint: tr(lang, "hint_imsak_notif"),
+                Switch {
+                    checked: draft.read().imsak_notif,
+                    on_change: move |on| {
+                        let mut s = draft.read().clone();
+                        s.imsak_notif = on;
+                        apply_settings(draft, s);
+                    },
+                }
+            }
         }
     }
 }
@@ -471,6 +537,30 @@ fn MiscGroup(draft: Signal<Settings>, on_autostart_error: EventHandler<String>) 
 
     rsx! {
         Group { label: tr(lang, "sec_misc"),
+            Row { label: tr(lang, "f_theme"),
+                Segmented {
+                    options: vec![
+                        ("system".to_string(), tr(lang, "theme_system").to_string()),
+                        ("dark".to_string(), tr(lang, "theme_dark").to_string()),
+                        ("light".to_string(), tr(lang, "theme_light").to_string()),
+                    ],
+                    active: match draft.read().theme {
+                        Theme::System => "system",
+                        Theme::Dark => "dark",
+                        Theme::Light => "light",
+                    }
+                    .to_string(),
+                    on_select: move |v: String| {
+                        let mut s = draft.read().clone();
+                        s.theme = match v.as_str() {
+                            "dark" => Theme::Dark,
+                            "light" => Theme::Light,
+                            _ => Theme::System,
+                        };
+                        apply_settings(draft, s);
+                    },
+                }
+            }
             Row { label: tr(lang, "f_language"),
                 Segmented {
                     options: vec![
@@ -489,6 +579,24 @@ fn MiscGroup(draft: Signal<Settings>, on_autostart_error: EventHandler<String>) 
                     },
                 }
             }
+            Row { label: tr(lang, "f_time_format"),
+                Segmented {
+                    options: vec![
+                        ("24".to_string(), tr(lang, "fmt_24").to_string()),
+                        ("12".to_string(), tr(lang, "fmt_12").to_string()),
+                    ],
+                    active: if draft.read().time_format_24 {
+                        "24".to_string()
+                    } else {
+                        "12".to_string()
+                    },
+                    on_select: move |v: String| {
+                        let mut s = draft.read().clone();
+                        s.time_format_24 = v == "24";
+                        apply_settings(draft, s);
+                    },
+                }
+            }
             Row { label: tr(lang, "f_autostart"),
                 Switch {
                     checked: draft.read().autostart,
@@ -500,6 +608,23 @@ fn MiscGroup(draft: Signal<Settings>, on_autostart_error: EventHandler<String>) 
                         }
                         Err(err) => on_autostart_error.call(err),
                     },
+                }
+            }
+            Row { label: tr(lang, "f_update_check"), hint: tr(lang, "hint_update_check"),
+                Switch {
+                    checked: draft.read().update_check,
+                    on_change: move |on| {
+                        let mut s = draft.read().clone();
+                        s.update_check = on;
+                        apply_settings(draft, s);
+                    },
+                }
+            }
+            Row { label: tr(lang, "update_check_row"),
+                button {
+                    class: "{BTN}",
+                    onclick: move |_| crate::update::check_now_manual(),
+                    "{tr(lang, \"update_check_btn\")}"
                 }
             }
         }

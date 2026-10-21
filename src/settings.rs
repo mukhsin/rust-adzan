@@ -1,5 +1,6 @@
 use chrono_tz::Tz;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::path::PathBuf;
 
 /// Nama aplikasi yang tampil ke user (judul window native, taskbar, dll).
@@ -98,6 +99,14 @@ pub struct Settings {
     /// Sholat yang adzannya di-mute (icon bell-off di daftar jadwal):
     /// tidak ada pemutaran audio, notifikasi tetap jalan.
     pub muted_prayers: Vec<crate::prayer::PrayerKind>,
+    /// Koreksi manual menit per sholat (−30..=30): selaraskan jadwal dengan
+    /// masjid setempat yang selisih dari perhitungan astronomis. Terbit tidak
+    /// punya offset; imsak selalu mengikuti Subuh yang sudah terkoreksi.
+    pub prayer_offsets: HashMap<crate::prayer::PrayerKind, i32>,
+    /// Toast saat masuk waktu imsak.
+    pub imsak_notif: bool,
+    /// Periksa rilis baru via GitHub Releases saat startup & tiap 12 jam.
+    pub update_check: bool,
 }
 
 impl Default for Settings {
@@ -121,6 +130,9 @@ impl Default for Settings {
             time_format_24: true,
             language: Language::Id,
             muted_prayers: Vec::new(),
+            prayer_offsets: HashMap::new(),
+            imsak_notif: true,
+            update_check: true,
         }
     }
 }
@@ -133,6 +145,16 @@ impl Settings {
     /// Zona waktu pilihan untuk input koordinat manual.
     pub fn set_timezone_name(&mut self, name: &str) {
         self.timezone = name.to_string();
+    }
+
+    /// Offset terkoreksi (menit) untuk satu sholat; dibatasi ±30 agar config
+    /// yang diedit manual tidak menggeser waktu ke hari sebelumnya.
+    pub fn offset_of(&self, kind: crate::prayer::PrayerKind) -> i32 {
+        self.prayer_offsets
+            .get(&kind)
+            .copied()
+            .unwrap_or(0)
+            .clamp(-30, 30)
     }
 }
 
@@ -206,6 +228,12 @@ mod tests {
             crate::prayer::PrayerKind::Subuh,
             crate::prayer::PrayerKind::Isya,
         ];
+        s.prayer_offsets = [
+            (crate::prayer::PrayerKind::Maghrib, 2),
+            (crate::prayer::PrayerKind::Subuh, -1),
+        ]
+        .into_iter()
+        .collect();
 
         let json = serde_json::to_string(&s).unwrap();
         let back: Settings = serde_json::from_str(&json).unwrap();
@@ -219,5 +247,18 @@ mod tests {
         assert_eq!(back.lat, -7.0);
         assert_eq!(back.method, CalcMethod::Kemenag);
         assert!(back.audio_enabled);
+        assert!(back.imsak_notif);
+        assert!(back.update_check);
+        assert!(back.prayer_offsets.is_empty());
+    }
+
+    #[test]
+    fn offset_dibatasi_maksimal_30_menit() {
+        let mut s = Settings::default();
+        s.prayer_offsets
+            .insert(crate::prayer::PrayerKind::Subuh, -300);
+        assert_eq!(s.offset_of(crate::prayer::PrayerKind::Subuh), -30);
+        // Sholat tanpa offset = 0.
+        assert_eq!(s.offset_of(crate::prayer::PrayerKind::Isya), 0);
     }
 }

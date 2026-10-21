@@ -108,16 +108,23 @@ pub fn day_times(settings: &Settings, date: NaiveDate) -> Option<DayTimes> {
 
     let local =
         |t: Prayer, sched: &PrayerTimes| -> NaiveTime { sched.time(t).with_timezone(&tz).time() };
+    // Koreksi manual per sholat (settings → masjid setempat). Imsak mengikuti
+    // Subuh yang sudah terkoreksi; subuh_esok juga, agar countdown lintas
+    // tengah malam memakai jadwal yang sama dengan trigger adzan.
+    let geser = |kind: PrayerKind, t: NaiveTime| -> NaiveTime {
+        t + Duration::minutes(settings.offset_of(kind) as i64)
+    };
+    let subuh = geser(PrayerKind::Subuh, local(Prayer::Fajr, &schedule));
 
     Some(DayTimes {
-        imsak: local(Prayer::Fajr, &schedule) - Duration::minutes(10),
-        subuh: local(Prayer::Fajr, &schedule),
+        imsak: subuh - Duration::minutes(10),
+        subuh,
         terbit: local(Prayer::Sunrise, &schedule),
-        dzuhur: local(Prayer::Dhuhr, &schedule),
-        ashar: local(Prayer::Asr, &schedule),
-        maghrib: local(Prayer::Maghrib, &schedule),
-        isya: local(Prayer::Isha, &schedule),
-        subuh_esok: local(Prayer::Fajr, &schedule_tomorrow),
+        dzuhur: geser(PrayerKind::Dzuhur, local(Prayer::Dhuhr, &schedule)),
+        ashar: geser(PrayerKind::Ashar, local(Prayer::Asr, &schedule)),
+        maghrib: geser(PrayerKind::Maghrib, local(Prayer::Maghrib, &schedule)),
+        isya: geser(PrayerKind::Isya, local(Prayer::Isha, &schedule)),
+        subuh_esok: geser(PrayerKind::Subuh, local(Prayer::Fajr, &schedule_tomorrow)),
     })
 }
 
@@ -295,6 +302,30 @@ mod tests {
     }
 
     #[test]
+    fn offset_menggeser_semua_konsumen_jadwal() {
+        // Koreksi +3 menit Maghrib & −2 menit Subuh harus terlihat di
+        // DayTimes (scheduler, countdown, widget semuanya baca field ini).
+        let date = NaiveDate::from_ymd_opt(2026, 10, 15).unwrap();
+        let mut s = jakarta();
+        s.prayer_offsets.insert(PrayerKind::Maghrib, 3);
+        s.prayer_offsets.insert(PrayerKind::Subuh, -2);
+        let murni = day_times(&jakarta(), date).unwrap();
+        let dikoreksi = day_times(&s, date).unwrap();
+
+        let menit = |a: NaiveTime, b: NaiveTime| -> i64 {
+            (a.num_seconds_from_midnight() as i64 - b.num_seconds_from_midnight() as i64) / 60
+        };
+        assert_eq!(menit(dikoreksi.maghrib, murni.maghrib), 3);
+        assert_eq!(menit(dikoreksi.subuh, murni.subuh), -2);
+        assert_eq!(menit(dikoreksi.subuh_esok, murni.subuh_esok), -2);
+        // Imsak mengikuti Subuh terkoreksi, tetap 10 menit sebelumnya.
+        assert_eq!(menit(dikoreksi.imsak, dikoreksi.subuh), -10);
+        // Terbit & sholat tanpa offset tidak bergeser.
+        assert_eq!(dikoreksi.terbit, murni.terbit);
+        assert_eq!(dikoreksi.dzuhur, murni.dzuhur);
+    }
+
+    #[test]
     fn next_prayer_setelah_isya_menuju_subuh_esok() {
         let date = NaiveDate::from_ymd_opt(2026, 10, 15).unwrap();
         let t = day_times(&jakarta(), date).unwrap();
@@ -326,5 +357,25 @@ mod tests {
 
         // Tepat pada waktunya = nol.
         assert_eq!(time_until(hm(17, 50), hm(17, 50)), Duration::zero());
+    }
+
+    /// Helper debug: cetak jadwal hari ini memakai settings bawaan (Jakarta,
+    /// tanpa offset). Jalankan:
+    /// `cargo test debug_cetak_jadwal -- --ignored --nocapture`
+    #[test]
+    #[ignore]
+    fn debug_cetak_jadwal_hari_ini() {
+        let s = Settings::default();
+        let today = chrono::Utc::now().with_timezone(&s.timezone()).date_naive();
+        if let Some(t) = day_times(&s, today) {
+            println!(
+                "jadwal {today} (kota {:?}, offset aktif: {:?}):",
+                s.city, s.prayer_offsets
+            );
+            for kind in ADZAN_PRAYERS {
+                println!("  {:8} = {}", kind.nama(s.language), t.waktu(kind));
+            }
+            println!("  imsak    = {}", t.imsak);
+        }
     }
 }

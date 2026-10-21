@@ -13,6 +13,8 @@ pub enum Action {
     NotifyAdzan(PrayerKind),
     /// Toast pengingat X menit sebelum adzan.
     NotifyPre { kind: PrayerKind, minutes: u32 },
+    /// Toast masuk waktu imsak (tanpa audio — imsak bukan adzan).
+    NotifyImsak,
 }
 
 #[derive(Debug, Default)]
@@ -20,6 +22,7 @@ pub struct EngineState {
     date: Option<NaiveDate>,
     played: HashSet<PrayerKind>,
     pre_notified: HashSet<PrayerKind>,
+    imsak_notified: bool,
 }
 
 impl EngineState {
@@ -40,6 +43,7 @@ pub fn tick(state: &mut EngineState, settings: &Settings, now: DateTime<Tz>) -> 
         state.date = Some(today);
         state.played.clear();
         state.pre_notified.clear();
+        state.imsak_notified = false;
     }
 
     let Some(times) = day_times(settings, today) else {
@@ -91,6 +95,18 @@ pub fn tick(state: &mut EngineState, settings: &Settings, now: DateTime<Tz>) -> 
                     });
                 }
             }
+        }
+    }
+
+    // Toast masuk waktu imsak — tanpa audio, dan tidak terpengaruh mute
+    // adzan (imsak penanda waktu sahur, bukan adzan). Imsak selalu sebelum
+    // Subuh pada hari yang sama, jadi tidak ada kasus lintas tengah malam.
+    if settings.notif_enabled && settings.imsak_notif && !state.imsak_notified {
+        let imsak_secs = times.imsak.num_seconds_from_midnight() as i64;
+        let imsak_elapsed = now_t.num_seconds_from_midnight() as i64 - imsak_secs;
+        if (0..=2).contains(&imsak_elapsed) {
+            state.imsak_notified = true;
+            actions.push(Action::NotifyImsak);
         }
     }
 
@@ -150,6 +166,10 @@ fn execute(action: Action, settings: &Settings) {
                 "notifikasi pengingat {} ({minutes} menit)",
                 kind.nama(lang)
             ));
+        }
+        Action::NotifyImsak => {
+            crate::notify::show(tr(lang, "notif_imsak_title"), tr(lang, "notif_imsak_body"));
+            crate::logger::info("notifikasi masuk waktu imsak");
         }
     }
 }
@@ -357,5 +377,74 @@ mod tests {
         let now = fake_now(s.timezone(), (2026, 10, 15), late);
         let actions = tick(&mut state, &s, now);
         assert!(actions.is_empty(), "{actions:?}");
+    }
+
+    #[test]
+    fn imsak_toast_tepat_waktu_dan_tidak_double() {
+        let s = settings_dengan_jadwal();
+        let mut state = EngineState::new();
+        let date = (2026, 10, 15);
+        let times = day_times(&s, NaiveDate::from_ymd_opt(2026, 10, 15).unwrap()).unwrap();
+
+        // Detik tepat imsak → toast imsak, tanpa audio.
+        let now = fake_now(
+            s.timezone(),
+            date,
+            (
+                times.imsak.hour(),
+                times.imsak.minute(),
+                times.imsak.second(),
+            ),
+        );
+        let actions = tick(&mut state, &s, now);
+        assert!(actions.contains(&Action::NotifyImsak), "{actions:?}");
+        assert!(
+            !actions.iter().any(|a| matches!(a, Action::PlayAdzan(_))),
+            "imsak tidak boleh memicu audio: {actions:?}"
+        );
+
+        // Tick berikutnya tidak double-trigger.
+        let actions = tick(&mut state, &s, now + Duration::seconds(1));
+        assert!(!actions.contains(&Action::NotifyImsak), "{actions:?}");
+    }
+
+    #[test]
+    fn imsak_toast_matikan_lewat_setting() {
+        let mut s = settings_dengan_jadwal();
+        s.imsak_notif = false;
+        let mut state = EngineState::new();
+        let times = day_times(&s, NaiveDate::from_ymd_opt(2026, 10, 15).unwrap()).unwrap();
+        let now = fake_now(
+            s.timezone(),
+            (2026, 10, 15),
+            (
+                times.imsak.hour(),
+                times.imsak.minute(),
+                times.imsak.second(),
+            ),
+        );
+        let actions = tick(&mut state, &s, now);
+        assert!(!actions.contains(&Action::NotifyImsak), "{actions:?}");
+    }
+
+    #[test]
+    fn imsak_toast_ikut_offset_subuh() {
+        // Offset Subuh −5 menit menggeser imsak (subuh −10 menit) juga −5.
+        let date = NaiveDate::from_ymd_opt(2026, 10, 15).unwrap();
+        let mut s = settings_dengan_jadwal();
+        s.prayer_offsets.insert(PrayerKind::Subuh, -5);
+        let mut state = EngineState::new();
+        let times = day_times(&s, date).unwrap();
+        let now = fake_now(
+            s.timezone(),
+            (2026, 10, 15),
+            (
+                times.imsak.hour(),
+                times.imsak.minute(),
+                times.imsak.second(),
+            ),
+        );
+        let actions = tick(&mut state, &s, now);
+        assert!(actions.contains(&Action::NotifyImsak), "{actions:?}");
     }
 }

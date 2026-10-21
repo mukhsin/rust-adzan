@@ -86,6 +86,37 @@ pub fn show(title: &str, body: &str) {
     }
 }
 
+/// Toast yang badannya bisa diklik — dipakai toast pembaruan: klik membuka
+/// `url` (halaman rilis) di browser bawaan.
+pub fn show_clickable(title: &str, body: &str, url: String) {
+    let result = Toast::new(APP_ID)
+        .title(title)
+        .text1(body)
+        .sound(Some(Sound::Default))
+        .on_activated(move |_| {
+            open_url(&url);
+            Ok(())
+        })
+        .show();
+    if let Err(e) = result {
+        crate::logger::error(&format!("notifikasi gagal: {e}"));
+    }
+}
+
+/// Buka URL di browser bawaan via `cmd /C start`. CREATE_NO_WINDOW mencegah
+/// jendela console berkedip pada build GUI.
+fn open_url(url: &str) {
+    use std::os::windows::process::CommandExt;
+    const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+    let result = std::process::Command::new("cmd")
+        .args(["/C", "start", "", url])
+        .creation_flags(CREATE_NO_WINDOW)
+        .spawn();
+    if let Err(e) = result {
+        crate::logger::error(&format!("gagal membuka {url}: {e}"));
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
