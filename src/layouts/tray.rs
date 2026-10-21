@@ -1,9 +1,9 @@
 //! Ikon system tray + menu (Tampilkan / Widget Desktop / Keluar).
 
+use crate::layouts::window;
 use crate::state;
-use crate::ui::window;
 use dioxus::desktop::trayicon::menu::{CheckMenuItem, MenuItem, PredefinedMenuItem};
-use dioxus::desktop::trayicon::{init_tray_icon, use_tray_icon};
+use dioxus::desktop::trayicon::{TrayIconBuilder, use_tray_icon};
 use dioxus::desktop::use_muda_event_handler;
 use dioxus::desktop::use_tray_icon_event_handler;
 use dioxus::prelude::*;
@@ -12,6 +12,8 @@ use dioxus::prelude::*;
 #[component]
 pub fn TraySetup() -> Element {
     // Inisialisasi tray (sekali) — jangan memanggil hook lain di dalam use_hook.
+    // Dibangun lewat TrayIconBuilder langsung (bukan init_tray_icon) supaya
+    // bisa memasang TOOLTIP nama aplikasi saat ikon tray di-hover.
     use_hook(|| {
         let lang = state::settings().language;
         let menu = dioxus::desktop::trayicon::menu::Menu::new();
@@ -33,10 +35,20 @@ pub fn TraySetup() -> Element {
         ])
         .expect("isi menu tray");
 
-        let icon =
-            dioxus::desktop::trayicon::Icon::from_rgba(crate::ui::TRAY_ICON_RGBA.to_vec(), 32, 32)
-                .expect("tray icon");
-        let _tray = init_tray_icon(menu, Some(icon));
+        let icon = dioxus::desktop::trayicon::Icon::from_rgba(
+            crate::layouts::TRAY_ICON_RGBA.to_vec(),
+            32,
+            32,
+        )
+        .expect("tray icon");
+        let tray = TrayIconBuilder::new()
+            .with_menu(Box::new(menu))
+            .with_menu_on_left_click(false)
+            .with_tooltip(crate::settings::APP_NAME)
+            .with_icon(icon)
+            .build()
+            .expect("tray icon builder failed");
+        provide_context(tray);
         state::WIDGET_MENU_ITEM.with(|cell| *cell.borrow_mut() = Some(widget));
         state::TRAY_SHOW_ITEM.with(|cell| *cell.borrow_mut() = Some(show));
         state::TRAY_QUIT_ITEM.with(|cell| *cell.borrow_mut() = Some(quit));

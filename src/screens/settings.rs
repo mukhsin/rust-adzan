@@ -5,17 +5,17 @@
 
 use crate::autostart;
 use crate::cities::{CITIES, find_city};
+use crate::components::ui::button::{BTN, BTN_ICON};
+use crate::components::ui::form::{INPUT, SELECT};
+use crate::components::ui::group::{Group, Row};
+use crate::components::ui::icons;
+use crate::components::ui::modal::Modal;
+use crate::components::ui::segmented::Segmented;
+use crate::components::ui::stepper::Stepper;
+use crate::components::ui::switch::Switch;
 use crate::i18n::tr;
 use crate::settings::{CalcMethod, Language, MadhabChoice, Settings, Theme};
 use crate::state;
-use crate::ui::components::ui::button::{BTN, BTN_ICON};
-use crate::ui::components::ui::form::{INPUT, SELECT};
-use crate::ui::components::ui::group::{Group, Row};
-use crate::ui::components::ui::icons;
-use crate::ui::components::ui::modal::Modal;
-use crate::ui::components::ui::segmented::Segmented;
-use crate::ui::components::ui::stepper::Stepper;
-use crate::ui::components::ui::switch::Switch;
 use dioxus::prelude::*;
 use std::path::PathBuf;
 
@@ -67,11 +67,11 @@ pub fn SettingsView() -> Element {
             div { class: "flex items-start gap-[18px]",
                 div { class: "flex-1 flex flex-col gap-[18px]",
                     LocationGroup { draft }
-                    AudioGroup { draft, playing_umum, playing_subuh }
-                }
-                div { class: "flex-1 flex flex-col gap-[18px]",
                     CalculationGroup { draft }
                     AppearanceGroup { draft }
+                }
+                div { class: "flex-1 flex flex-col gap-[18px]",
+                    AudioGroup { draft, playing_umum, playing_subuh }
                     NotificationGroup { draft }
                     MiscGroup { draft,
                         on_autostart_error: move |err: String| dialog.set(Dialog::AutostartError(err)),

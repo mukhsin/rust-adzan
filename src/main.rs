@@ -5,15 +5,17 @@
 mod audio;
 mod autostart;
 mod cities;
+mod components;
 mod hijri;
 mod i18n;
+mod layouts;
 mod logger;
 mod notify;
 mod prayer;
 mod scheduler;
+mod screens;
 mod settings;
 mod state;
-mod ui;
 
 use dioxus::desktop::{Config, WindowBuilder, WindowCloseBehaviour, tao::dpi::LogicalSize};
 
@@ -31,7 +33,7 @@ fn main() {
     }
 
     let window_icon =
-        dioxus::desktop::tao::window::Icon::from_rgba(ui::WINDOW_ICON_RGBA.to_vec(), 256, 256)
+        dioxus::desktop::tao::window::Icon::from_rgba(layouts::WINDOW_ICON_RGBA.to_vec(), 256, 256)
             .expect("ikon window valid");
 
     let config = Config::new()
@@ -56,5 +58,5 @@ fn main() {
 
     dioxus::LaunchBuilder::desktop()
         .with_cfg(config)
-        .launch(ui::app);
+        .launch(layouts::app);
 }

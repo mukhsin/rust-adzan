@@ -6,10 +6,10 @@
 //! papan kanan lebih tinggi total (items-start), bukan dipaksa sama tinggi
 //! seperti mockup yang membuat baris kanan lebih pendek.
 
+use crate::components::ui::icons;
 use crate::i18n::{month_name, tr};
 use crate::prayer;
 use crate::state;
-use crate::ui::components::ui::icons;
 use chrono::{Datelike, NaiveDate};
 use dioxus::prelude::*;
 

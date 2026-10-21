@@ -1,17 +1,10 @@
-//! Lapisan UI aplikasi.
+//! Layout aplikasi — root dom window utama, ikon system tray, dan
+//! manajemen window (widget window, clamp posisi, show/hide).
 //!
-//! Susunan modul:
-//! - [`app`] — root dom window utama: tab, tema, perintah lintas window.
-//! - [`tray`] — ikon system tray + menunya.
-//! - [`window`] — manajemen window (widget window, clamp posisi, show/hide).
-//! - [`components`] — komponen komposabel (tiket, papan jadwal, bar atas…).
-//!   - `components::ui` — komponen atomik (tombol, modal, sakelar, …).
-//! - [`screens`] — layar tab window utama (Harian, Pengaturan, Tentang).
+//! Layar ada di `crate::screens`; komponen di `crate::components`.
 
 pub mod app;
-pub mod components;
-pub mod screens;
-pub mod tray;
+pub(crate) mod tray;
 pub mod window;
 
 pub use app::app;

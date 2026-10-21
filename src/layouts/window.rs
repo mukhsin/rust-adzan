@@ -1,8 +1,8 @@
 //! Manajemen window: pembuatan widget window, snap/clamp posisi, dan
 //! perintah tampil/sembunyi dari tray maupun dom lain.
 
+use crate::components::widget::WidgetApp;
 use crate::state;
-use crate::ui::components::widget::WidgetApp;
 use dioxus::desktop::tao::dpi::{LogicalSize, PhysicalPosition};
 use dioxus::desktop::tao::platform::windows::WindowBuilderExtWindows;
 use dioxus::desktop::tao::window::Window;

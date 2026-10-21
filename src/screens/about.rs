@@ -2,10 +2,10 @@
 //! logo mosque asli, nama + tagline, pil versi, kartu INFORMASI
 //! (kunci–nilai), dan baris footer mono. Semua konten center.
 
+use crate::components::ui::icons;
 use crate::i18n::tr;
 use crate::settings::CalcMethod;
 use crate::state;
-use crate::ui::components::ui::icons;
 use dioxus::prelude::*;
 
 #[component]

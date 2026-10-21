@@ -3,10 +3,10 @@
 //! membulat + shadow. Mockup pen punya panel kanan yang berbeda, tapi
 //! isinya sudah tercakup di kartu ini sehingga kartu widget dipakai langsung.
 
+use crate::components::ticket::{Ticket, tanggal_labels};
 use crate::i18n::tr;
 use crate::prayer;
 use crate::state;
-use crate::ui::components::ticket::{Ticket, tanggal_labels};
 use dioxus::prelude::*;
 
 #[component]

@@ -1,13 +1,13 @@
 //! Root dom window utama: bar atas + layar sesuai tab aktif, sinkron tema
 //! lintas dom, dan penerima perintah tampil dari widget.
 
-use crate::state;
-use crate::ui::components::title_bar::{Tab, TitleBar};
-use crate::ui::screens::{
+use crate::components::title_bar::{Tab, TitleBar};
+use crate::layouts::tray::TraySetup;
+use crate::layouts::window;
+use crate::screens::{
     about::AboutView, daily::DailyView, monthly::MonthlyView, settings::SettingsView,
 };
-use crate::ui::tray::TraySetup;
-use crate::ui::window;
+use crate::state;
 use dioxus::prelude::*;
 
 pub fn app() -> Element {
@@ -82,7 +82,7 @@ pub fn app() -> Element {
     }
 
     rsx! {
-        style { {crate::ui::TAILWIND_CSS} }
+        style { {crate::layouts::TAILWIND_CSS} }
         TraySetup {}
         div { class: "{root_class}",
             TitleBar { tab: *tab.read(), on_select_tab: move |t: Tab| tab.set(t) }

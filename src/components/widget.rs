@@ -2,17 +2,17 @@
 //! transparan. Dom terpisah dari window utama; state dibaca dari global
 //! `state::settings()` setiap tick.
 
+use crate::components::ticket::{Ticket, tanggal_labels};
 use crate::i18n::tr;
+use crate::layouts::window;
 use crate::prayer;
 use crate::state;
-use crate::ui::components::ticket::{Ticket, tanggal_labels};
-use crate::ui::window;
 use dioxus::prelude::*;
 
 /// Root komponen widget window.
 /// Drag memakai mekanisme native (`window.drag()`, smooth seperti main
 /// window); saat drag selesai posisi di-snap ke margin oleh
-/// `crate::ui::window::clamp_widget_position`.
+/// `crate::layouts::window::clamp_widget_position`.
 #[allow(non_snake_case)]
 pub fn WidgetApp() -> Element {
     // Window widget dibuat tersembunyi; tampilkan setelah dom siap. Efek ini
@@ -51,7 +51,7 @@ pub fn WidgetApp() -> Element {
     }
 
     rsx! {
-        style { {crate::ui::TAILWIND_CSS} }
+        style { {crate::layouts::TAILWIND_CSS} }
         div {
             class: "{root_class}",
             // Drag native — modal loop OS, kembali saat mouse dilepas.
