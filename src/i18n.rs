@@ -22,6 +22,7 @@ const PHRASES: &[(&str, &str, &str)] = &[
     ("coming_soon", "Belum tersedia", "Not available yet"),
     ("col_tgl", "Tgl", "Date"),
     ("today", "Hari ini", "Today"),
+    ("day_ahad", "Ahad", "Sunday"),
     ("prev_month", "Bulan sebelumnya", "Previous month"),
     ("next_month", "Bulan berikutnya", "Next month"),
     (

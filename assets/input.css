@@ -35,6 +35,10 @@
   --c-sheet: #f4f1ec;
   --c-board: #fbf9f5;
   --c-on-ink: #f4f1ec;
+  /* Kalender: Ahad (merah) & Jum'at (hijau), teks redup papan. */
+  --c-ahad: #b3492f;
+  --c-jumat: #3f7d54;
+  --c-board-dim: #6e675a;
 }
 .dark {
   --c-pass: #202227;
@@ -49,6 +53,9 @@
   --c-sheet: #17181c;
   --c-board: #101114;
   --c-on-ink: #17181c;
+  --c-ahad: #e0917c;
+  --c-jumat: #92c4a4;
+  --c-board-dim: #61666f;
 }
 @theme inline {
   --color-pass: var(--c-pass);
@@ -63,6 +70,9 @@
   --color-sheet: var(--c-sheet);
   --color-board: var(--c-board);
   --color-on-ink: var(--c-on-ink);
+  --color-ahad: var(--c-ahad);
+  --color-jumat: var(--c-jumat);
+  --color-board-dim: var(--c-board-dim);
 }
 
 html,

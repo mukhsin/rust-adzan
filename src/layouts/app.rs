@@ -5,15 +5,14 @@ use crate::components::title_bar::{Tab, TitleBar};
 use crate::layouts::tray::TraySetup;
 use crate::layouts::window;
 use crate::screens::{
-    about::AboutView, daily::DailyView, monthly::MonthlyView, settings::SettingsView,
+    about::AboutView, calendar::CalendarView, daily::DailyView, monthly::MonthlyView,
+    settings::SettingsView,
 };
 use crate::state;
 use dioxus::prelude::*;
 
 pub fn app() -> Element {
     let mut theme = use_signal(|| state::settings().theme);
-    let lang = state::settings().language;
-    let tr = crate::i18n::tr;
     // Tab aktif bar atas. Layar Bulanan & Kalender menyusul — untuk kini
     // keduanya menampilkan placeholder.
     let mut tab = use_signal(|| Tab::Pengaturan);
@@ -91,13 +90,7 @@ pub fn app() -> Element {
                 Tab::Tentang => rsx! { AboutView {} },
                 Tab::Harian => rsx! { DailyView {} },
                 Tab::Bulanan => rsx! { MonthlyView {} },
-                Tab::Kalender => rsx! {
-                    div { class: "flex-1 flex items-center justify-center",
-                        span { class: "font-mono text-xs font-semibold tracking-[0.14em] uppercase text-ink-3",
-                            "{tr(lang, \"coming_soon\")}"
-                        }
-                    }
-                },
+                Tab::Kalender => rsx! { CalendarView {} },
             }
         }
     }

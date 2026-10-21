@@ -10,6 +10,7 @@ use dioxus::prelude::*;
 /// Tab aplikasi pada bar atas (design system pen). Layar Bulanan & Kalender
 /// menyusul — lihat placeholder di `crate::layouts::app`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[allow(dead_code)] // Harian sementara nonaktif (tab di-comment)
 pub enum Tab {
     Harian,
     Bulanan,
