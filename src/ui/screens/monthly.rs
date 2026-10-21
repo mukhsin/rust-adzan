@@ -156,7 +156,7 @@ fn MonthBoard(label: String, rows: Vec<HariRow>, today_day: Option<u32>) -> Elem
                     let is_today = today_day == Some(row.day);
                     let is_last = i == rows.len() - 1;
                     let row_class = if is_today {
-                        "flex items-center gap-3.5 px-2.5 bg-amber"
+                        "flex items-center gap-3.5 px-2.5 rounded-md bg-amber"
                     } else if is_last {
                         "flex items-center gap-3.5 px-2.5"
                     } else {
