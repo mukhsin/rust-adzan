@@ -29,12 +29,34 @@ UninstallIcon "${ICON_SRC}"
 !insertmacro MUI_PAGE_WELCOME
 !insertmacro MUI_PAGE_DIRECTORY
 !insertmacro MUI_PAGE_INSTFILES
+; Halaman akhir: checkbox "jalankan aplikasi" — default TER CENTANG.
+!define MUI_FINISHPAGE_RUN
+!define MUI_FINISHPAGE_RUN_CHECKED
+!define MUI_FINISHPAGE_RUN_TEXT "Jalankan ${APPNAME} setelah instalasi selesai"
+!define MUI_FINISHPAGE_RUN_FUNCTION "LaunchApp"
 !insertmacro MUI_PAGE_FINISH
 !insertmacro MUI_UNPAGE_CONFIRM
 !insertmacro MUI_UNPAGE_INSTFILES
 !insertmacro MUI_LANGUAGE "Indonesian"
 
+Function LaunchApp
+  Exec '"$INSTDIR\${EXENAME}"'
+FunctionEnd
+
 Section "Install"
+  ; App sedang berjalan? Tutup dulu (upgrade di tempat). WM_CLOSE hanya
+  ; menyembunyikan window (app tetap di tray), jadi pakai taskkill /F.
+  FindWindow $0 "" "${APPNAME}"
+  ${If} $0 != 0
+    MessageBox MB_OKCANCEL|MB_ICONEXCLAMATION \
+      "${APPNAME} sedang berjalan dan akan ditutup sementara agar pembaruan berhasil. Buka kembali aplikasi setelah instalasi selesai.$\n$\nLanjutkan?" \
+      IDOK +2
+    Abort
+    nsExec::Exec 'taskkill /F /IM "${EXENAME}"'
+    Pop $0
+    Sleep 750
+  ${EndIf}
+
   ; WebView2 Runtime: pasang bootstrapper jika belum ada (cek HKLM/HKCU).
   ReadRegStr $0 HKLM "${WEBVIEW2_KEY}" "pv"
   ReadRegStr $1 HKCU "${WEBVIEW2_KEY}" "pv"
@@ -48,7 +70,14 @@ Section "Install"
   ${EndIf}
 
   SetOutPath "$INSTDIR"
+  ; Exe lama yang masih dipakai proses tidak bisa ditimpa (Windows mengunci
+  ; file yang dijalankan) — tapi RENAME-nya boleh. Rename ke .old sebagai
+  ; jaring pengaman, tulis exe baru, lalu bersihkan .old (gagal diam-diam
+  ; bila proses lama masih hidup; terhapus di install/uninstall berikutnya).
+  Delete "$INSTDIR\${EXENAME}.old"
+  Rename "$INSTDIR\${EXENAME}" "$INSTDIR\${EXENAME}.old"
   File "/oname=${EXENAME}" "${EXE_SRC}"
+  Delete "$INSTDIR\${EXENAME}.old"
   WriteUninstaller "$INSTDIR\uninstall.exe"
 
   ; Shortcut Start Menu + Desktop.
@@ -67,6 +96,13 @@ Section "Install"
 SectionEnd
 
 Section "Uninstall"
+  ; Tutup app yang mungkin sedang jalan (user sudah memilih uninstall —
+  ; tanpa bertanya).
+  nsExec::Exec 'taskkill /F /IM "${EXENAME}"'
+  Pop $0
+  Sleep 750
+
+  Delete "$INSTDIR\${EXENAME}.old"
   Delete "$INSTDIR\${EXENAME}"
   Delete "$INSTDIR\uninstall.exe"
   RMDir "$INSTDIR"
