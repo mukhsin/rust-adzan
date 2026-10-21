@@ -1,8 +1,10 @@
 //! Pane kiri kartu tiket: identitas + kota, hitung mundur ke sholat
 //! berikutnya, dan tiga label tanggal (hari / masehi / hijri).
+//! Saat Ramadhan (sebelum Maghrib): badge hari ke-N dan hitung mundur
+//! berlabel "Menuju Berbuka".
 
 use crate::i18n::tr;
-use crate::prayer::{self, DayTimes};
+use crate::prayer::{self, DayTimes, PrayerKind};
 use crate::state;
 use chrono::NaiveTime;
 use dioxus::prelude::*;
@@ -15,6 +17,7 @@ pub fn CountdownPane(
     hari: String,
     tanggal: String,
     tanggal_hijri: String,
+    ramadan_day: Option<u32>,
 ) -> Element {
     let settings = state::settings();
     let lang = settings.language;
@@ -30,8 +33,16 @@ pub fn CountdownPane(
         prayer::format_time(target, settings.time_format_24),
         tz
     );
-    let menuju = format!("{} {}", tr(lang, "countdown_prefix"), next_kind.nama(lang));
+    // Saat puasa dan menunggu Maghrib, berbuka lebih bermakna daripada
+    // nama sholatnya; selebihnya label standar.
+    let menuju = if ramadan_day.is_some() && next_kind == PrayerKind::Maghrib {
+        tr(lang, "countdown_berbuka").to_string()
+    } else {
+        format!("{} {}", tr(lang, "countdown_prefix"), next_kind.nama(lang))
+    };
     let masuk = tr(lang, "masuk_pukul").replace("{waktu}", &jam_target);
+    let badge_ramadan =
+        ramadan_day.map(|day| tr(lang, "ramadan_badge").replace("{n}", &day.to_string()));
 
     rsx! {
         div { class: "flex-1",
@@ -40,6 +51,11 @@ pub fn CountdownPane(
                     span {
                         class: "font-mono text-[10.5px] font-semibold tracking-[0.08em] uppercase text-ink-3 truncate",
                         "{tr(lang, \"app_name\")} · {kota}"
+                    }
+                    if let Some(badge) = badge_ramadan {
+                        span { class: "font-mono text-[10.5px] font-semibold tracking-[0.08em] uppercase text-amber truncate",
+                            "{badge}"
+                        }
                     }
                 }
                 div { class: "flex flex-col gap-2",

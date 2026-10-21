@@ -17,6 +17,7 @@ mod qibla;
 mod scheduler;
 mod screens;
 mod settings;
+mod single;
 mod state;
 mod update;
 
@@ -24,6 +25,10 @@ use dioxus::desktop::{Config, WindowBuilder, WindowCloseBehaviour, tao::dpi::Log
 
 fn main() {
     logger::init();
+
+    // Satu instance saja: instance kedua toast "sudah berjalan" lalu keluar
+    // (mencegah dua scheduler — adzan dobel).
+    single::exit_if_duplicate();
 
     // Muat settings ke global + nyalakan engine adzan (thread terpisah).
     let _ = state::settings();

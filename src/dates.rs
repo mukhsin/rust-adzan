@@ -87,6 +87,15 @@ pub fn ramadan_status(today: NaiveDate) -> RamadanStatus {
     }
 }
 
+/// Hari ke-N Ramadhan bila `today` jatuh saat puasa, `None` selain itu —
+/// ringkasan [`ramadan_status`] untuk UI.
+pub fn ramadan_day(today: NaiveDate) -> Option<u32> {
+    match ramadan_status(today) {
+        RamadanStatus::Berlangsung { day } => Some(day),
+        RamadanStatus::Menunggu { .. } => None,
+    }
+}
+
 /// Tanggal penting bila (bulan, tanggal) hijriah adalah hari peristiwa —
 /// dipakai penanda layar Kalender.
 pub fn by_hijri(month: u32, day: u32) -> Option<EventKind> {
@@ -153,5 +162,22 @@ mod tests {
         assert_eq!(by_hijri(10, 1), Some(EventKind::IdulFitri));
         assert_eq!(by_hijri(9, 2), None);
         assert_eq!(by_hijri(5, 10), None);
+    }
+
+    #[test]
+    fn ramadan_day_mengikuti_bulan_hijri() {
+        let dasar = NaiveDate::from_ymd_opt(2026, 10, 21).unwrap();
+        // Okt 2026 bukan Ramadan.
+        assert_eq!(ramadan_day(dasar), None);
+        // Cari 1 Ramadhan berikutnya dari kalender itu sendiri (tanpa
+        // hardcode tanggal masehi), lalu cek hitungan hari-N.
+        let awal = (0..400)
+            .map(|i| dasar + Duration::days(i))
+            .find(|&t| to_hijri(t).1 == 9)
+            .expect("Ramadhan pasti datang dalam setahun");
+        assert_eq!(to_hijri(awal).2, 1);
+        assert_eq!(ramadan_day(awal), Some(1));
+        assert_eq!(ramadan_day(awal + Duration::days(14)), Some(15));
+        assert_eq!(ramadan_day(awal - Duration::days(1)), None);
     }
 }

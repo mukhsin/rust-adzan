@@ -78,7 +78,7 @@ pub fn PrayerTable(times: DayTimes, now: NaiveTime, next_kind: PrayerKind) -> El
 
     rsx! {
         div { class: "flex-1",
-            div { class: "flex flex-col p-4 h-full",
+            div { class: "flex flex-col p-4 pl-6 h-full",
                 for (i, row) in rows.iter().enumerate() {
                     {
                         let is_next = match row.kind {

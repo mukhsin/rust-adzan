@@ -6,13 +6,15 @@
 use crate::autostart;
 use crate::cities::{CITIES, find_city};
 use crate::components::ui::button::{BTN, BTN_ICON};
-use crate::components::ui::form::{INPUT, SELECT};
+use crate::components::ui::drop_search::DropSearch;
+use crate::components::ui::form::INPUT;
 use crate::components::ui::group::{Group, Row};
 use crate::components::ui::icons;
 use crate::components::ui::modal::Modal;
 use crate::components::ui::segmented::Segmented;
 use crate::components::ui::stepper::{OffsetStepper, Stepper};
 use crate::components::ui::switch::Switch;
+use crate::components::ui::tooltip::{PosisiTooltip, Tooltip};
 use crate::i18n::tr;
 use crate::settings::{CalcMethod, Language, MadhabChoice, Settings, Theme};
 use crate::state;
@@ -139,13 +141,21 @@ fn LocationGroup(draft: Signal<Settings>) -> Element {
 
     rsx! {
         Group { label: tr(lang, "sec_location"),
-            Row { label: tr(lang, "f_city"),
-                select {
-                    class: "{SELECT}",
-                    value: draft.read().city.clone().unwrap_or_default(),
-                    onchange: move |e| {
-                        let name = e.value();
-                        if let Some(city) = find_city(&name) {
+            Row { label: tr(lang, "f_city"), tooltip: Some(tr(lang, "hint_kota_tz").to_string()),
+                DropSearch {
+                    value: draft
+                        .read()
+                        .city
+                        .clone()
+                        .unwrap_or_else(|| tr(lang, "city_manual").to_string()),
+                    active: draft.read().city.clone().unwrap_or_default(),
+                    options: CITIES
+                        .iter()
+                        .map(|c| (c.name.to_string(), c.name.to_string()))
+                        .collect(),
+                    searchable: true,
+                    on_select: move |nama: String| {
+                        if let Some(city) = find_city(&nama) {
                             let mut s = draft.read().clone();
                             s.city = Some(city.name.to_string());
                             s.lat = city.lat;
@@ -154,10 +164,6 @@ fn LocationGroup(draft: Signal<Settings>) -> Element {
                             apply_settings(draft, s);
                         }
                     },
-                    option { value: "", "{tr(lang, \"city_manual\")}" }
-                    for city in CITIES {
-                        option { value: city.name, "{city.name}" }
-                    }
                 }
             }
             Row { label: tr(lang, "f_lat"),
@@ -191,21 +197,20 @@ fn LocationGroup(draft: Signal<Settings>) -> Element {
                 }
             }
             Row { label: tr(lang, "f_tz"),
-                select {
-                    class: "{SELECT}",
+                DropSearch {
                     value: draft.read().timezone.clone(),
-                    onchange: move |e| {
-                        let tz = e.value();
-                        if ZONA_WAKTU.iter().any(|(name, _)| *name == tz) {
-                            let mut s = draft.read().clone();
-                            s.set_timezone_name(&tz);
-                            s.city = None;
-                            apply_settings(draft, s);
-                        }
+                    active: draft.read().timezone.clone(),
+                    options: ZONA_WAKTU
+                        .iter()
+                        .map(|(name, label)| (name.to_string(), label.to_string()))
+                        .collect(),
+                    searchable: false,
+                    on_select: move |tz: String| {
+                        let mut s = draft.read().clone();
+                        s.set_timezone_name(&tz);
+                        s.city = None;
+                        apply_settings(draft, s);
                     },
-                    for (name, label) in ZONA_WAKTU {
-                        option { value: name, "{label}" }
-                    }
                 }
             }
         }
@@ -237,40 +242,54 @@ fn CalculationGroup(draft: Signal<Settings>) -> Element {
     rsx! {
         Group { label: tr(lang, "sec_calc"),
             Row { label: tr(lang, "f_method"),
-                select {
-                    class: "{SELECT}",
-                    value: method_name(draft.read().method),
-                    onchange: move |e| {
-                        let v = e.value();
-                        let mut s = draft.read().clone();
-                        if let Some(m) = method_from_name(&v) {
+                DropSearch {
+                    value: tr(lang, method_label(draft.read().method)).to_string(),
+                    active: method_name(draft.read().method).to_string(),
+                    options: METODE
+                        .iter()
+                        .map(|(kunci, kunci_i18n)| {
+                            ((*kunci).to_string(), tr(lang, kunci_i18n).to_string())
+                        })
+                        .collect(),
+                    searchable: false,
+                    on_select: move |kunci: String| {
+                        if let Some(m) = method_from_name(&kunci) {
+                            let mut s = draft.read().clone();
                             s.method = m;
                             apply_settings(draft, s);
                         }
                     },
-                    option { value: "kemenag", "{tr(lang, \"m_kemenag\")}" }
-                    option { value: "mwl", "{tr(lang, \"m_mwl\")}" }
-                    option { value: "egyptian", "{tr(lang, \"m_egyptian\")}" }
-                    option { value: "karachi", "{tr(lang, \"m_karachi\")}" }
-                    option { value: "umm_al_qura", "{tr(lang, \"m_umm_al_qura\")}" }
-                    option { value: "north_america", "{tr(lang, \"m_isna\")}" }
                 }
             }
             Row { label: tr(lang, "f_madhab"),
-                select {
-                    class: "{SELECT}",
-                    value: match draft.read().madhab {
-                        MadhabChoice::Shafi => "shafi",
-                        MadhabChoice::Hanafi => "hanafi",
+                DropSearch {
+                    value: if draft.read().madhab == MadhabChoice::Hanafi {
+                        tr(lang, "madhab_hanafi").to_string()
+                    } else {
+                        tr(lang, "madhab_shafi").to_string()
                     },
-                    onchange: move |e| {
-                        let v = e.value();
+                    active: if draft.read().madhab == MadhabChoice::Hanafi {
+                        "hanafi".to_string()
+                    } else {
+                        "shafi".to_string()
+                    },
+                    options: vec![
+                        ("shafi".to_string(), tr(lang, "madhab_shafi").to_string()),
+                        (
+                            "hanafi".to_string(),
+                            tr(lang, "madhab_hanafi").to_string(),
+                        ),
+                    ],
+                    searchable: false,
+                    on_select: move |kunci: String| {
                         let mut s = draft.read().clone();
-                        s.madhab = if v == "hanafi" { MadhabChoice::Hanafi } else { MadhabChoice::Shafi };
+                        s.madhab = if kunci == "hanafi" {
+                            MadhabChoice::Hanafi
+                        } else {
+                            MadhabChoice::Shafi
+                        };
                         apply_settings(draft, s);
                     },
-                    option { value: "shafi", "{tr(lang, \"madhab_shafi\")}" }
-                    option { value: "hanafi", "{tr(lang, \"madhab_hanafi\")}" }
                 }
             }
             for (key, kind) in BARIS_KOREKSI {
@@ -355,72 +374,70 @@ fn AudioGroup(
             }
             Row { label: tr(lang, "f_adzan_file"), hint: deskripsi_sumber(&draft.read(), false),
                 div { class: "flex items-center gap-2",
-                    button {
-                        class: "{BTN}",
-                        onclick: move |_| {
-                            if let Some(p) = pick_audio(lang) {
-                                let mut s = draft.read().clone();
-                                s.adzan_file = Some(p);
-                                apply_settings(draft, s);
-                            }
-                        },
-                        "{tr(lang, \"pick\")}"
+                    Tooltip { label: tr(lang, "pick_audio_title").to_string(), posisi: PosisiTooltip::Atas,
+                        button {
+                            class: "{BTN}",
+                            onclick: move |_| {
+                                if let Some(p) = pick_audio(lang) {
+                                    let mut s = draft.read().clone();
+                                    s.adzan_file = Some(p);
+                                    apply_settings(draft, s);
+                                }
+                            },
+                            "{tr(lang, \"pick\")}"
+                        }
                     }
-                    button {
-                        class: "{BTN_ICON}",
-                        title: if *playing_umum.read() {
-                            tr(lang, "stop_play")
-                        } else {
-                            tr(lang, "test_play")
-                        },
-                        onclick: move |_| {
+                    Tooltip { label: if *playing_umum.read() { tr(lang, "stop_play").to_string() } else { tr(lang, "test_play").to_string() }, posisi: PosisiTooltip::Atas,
+                        button {
+                            class: "{BTN_ICON}",
+                            onclick: move |_| {
+                                if *playing_umum.read() {
+                                    crate::audio::stop_slot(crate::audio::Slot::Umum);
+                                } else {
+                                    let s = state::settings();
+                                    let _ = crate::audio::play_adzan(&s, false);
+                                }
+                            },
                             if *playing_umum.read() {
-                                crate::audio::stop_slot(crate::audio::Slot::Umum);
+                                icons::IconSquare { class: "w-[13px] h-[13px]" }
                             } else {
-                                let s = state::settings();
-                                let _ = crate::audio::play_adzan(&s, false);
+                                icons::IconPlay { class: "w-[13px] h-[13px]" }
                             }
-                        },
-                        if *playing_umum.read() {
-                            icons::IconSquare { class: "w-[13px] h-[13px]" }
-                        } else {
-                            icons::IconPlay { class: "w-[13px] h-[13px]" }
                         }
                     }
                 }
             }
             Row { label: tr(lang, "f_subuh_file"), hint: deskripsi_sumber(&draft.read(), true),
                 div { class: "flex items-center gap-2",
-                    button {
-                        class: "{BTN}",
-                        onclick: move |_| {
-                            if let Some(p) = pick_audio(lang) {
-                                let mut s = draft.read().clone();
-                                s.subuh_file = Some(p);
-                                apply_settings(draft, s);
-                            }
-                        },
-                        "{tr(lang, \"pick\")}"
+                    Tooltip { label: tr(lang, "pick_audio_title").to_string(), posisi: PosisiTooltip::Atas,
+                        button {
+                            class: "{BTN}",
+                            onclick: move |_| {
+                                if let Some(p) = pick_audio(lang) {
+                                    let mut s = draft.read().clone();
+                                    s.subuh_file = Some(p);
+                                    apply_settings(draft, s);
+                                }
+                            },
+                            "{tr(lang, \"pick\")}"
+                        }
                     }
-                    button {
-                        class: "{BTN_ICON}",
-                        title: if *playing_subuh.read() {
-                            tr(lang, "stop_play")
-                        } else {
-                            tr(lang, "test_play_subuh")
-                        },
-                        onclick: move |_| {
+                    Tooltip { label: if *playing_subuh.read() { tr(lang, "stop_play").to_string() } else { tr(lang, "test_play_subuh").to_string() }, posisi: PosisiTooltip::Atas,
+                        button {
+                            class: "{BTN_ICON}",
+                            onclick: move |_| {
+                                if *playing_subuh.read() {
+                                    crate::audio::stop_slot(crate::audio::Slot::Subuh);
+                                } else {
+                                    let s = state::settings();
+                                    let _ = crate::audio::play_adzan(&s, true);
+                                }
+                            },
                             if *playing_subuh.read() {
-                                crate::audio::stop_slot(crate::audio::Slot::Subuh);
+                                icons::IconSquare { class: "w-[13px] h-[13px]" }
                             } else {
-                                let s = state::settings();
-                                let _ = crate::audio::play_adzan(&s, true);
+                                icons::IconPlay { class: "w-[13px] h-[13px]" }
                             }
-                        },
-                        if *playing_subuh.read() {
-                            icons::IconSquare { class: "w-[13px] h-[13px]" }
-                        } else {
-                            icons::IconPlay { class: "w-[13px] h-[13px]" }
                         }
                     }
                 }
@@ -621,10 +638,12 @@ fn MiscGroup(draft: Signal<Settings>, on_autostart_error: EventHandler<String>) 
                 }
             }
             Row { label: tr(lang, "update_check_row"),
-                button {
-                    class: "{BTN}",
-                    onclick: move |_| crate::update::check_now_manual(),
-                    "{tr(lang, \"update_check_btn\")}"
+                Tooltip { label: tr(lang, "hint_update_check").to_string(), posisi: PosisiTooltip::Kiri,
+                    button {
+                        class: "{BTN}",
+                        onclick: move |_| crate::update::check_now_manual(),
+                        "{tr(lang, \"update_check_btn\")}"
+                    }
                 }
             }
         }
@@ -640,6 +659,27 @@ fn method_name(m: CalcMethod) -> &'static str {
         CalcMethod::UmmAlQura => "umm_al_qura",
         CalcMethod::NorthAmerica => "north_america",
     }
+}
+
+/// (kunci nilai, kunci terjemahan) metode perhitungan — sumber dropdown
+/// custom di grup Perhitungan.
+const METODE: [(&str, &str); 6] = [
+    ("kemenag", "m_kemenag"),
+    ("mwl", "m_mwl"),
+    ("egyptian", "m_egyptian"),
+    ("karachi", "m_karachi"),
+    ("umm_al_qura", "m_umm_al_qura"),
+    ("north_america", "m_isna"),
+];
+
+/// Kunci terjemahan label untuk satu metode.
+fn method_label(m: CalcMethod) -> &'static str {
+    let nama = method_name(m);
+    METODE
+        .iter()
+        .find(|(kunci, _)| *kunci == nama)
+        .map(|(_, kunci_i18n)| *kunci_i18n)
+        .expect("metode selalu ada di tabel METODE")
 }
 
 fn method_from_name(s: &str) -> Option<CalcMethod> {

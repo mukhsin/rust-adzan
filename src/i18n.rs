@@ -332,6 +332,31 @@ const PHRASES: &[(&str, &str, &str)] = &[
         "Adzan {nama} akan dilewati — klik untuk membatalkan",
         "{nama} adhan will be skipped — click to cancel",
     ),
+    // Single-instance
+    (
+        "already_running",
+        "Aplikasi sudah berjalan di tray.",
+        "The app is already running in the tray.",
+    ),
+    // Pencarian kota (Droplist — Cari)
+    (
+        "city_search_hint",
+        "Ketik untuk mencari…",
+        "Type to search…",
+    ),
+    (
+        "hint_kota_tz",
+        "jadwal mengikuti zona waktu kota",
+        "schedule follows the city's timezone",
+    ),
+    ("no_result", "Tidak ada hasil", "No results"),
+    // Mode Ramadhan
+    ("countdown_berbuka", "Menuju Berbuka", "Until Iftar"),
+    (
+        "ramadan_badge",
+        "🌙 Ramadhan · hari ke-{n}",
+        "🌙 Ramadan · day {n}",
+    ),
 ];
 
 /// Ambil terjemahan `key` untuk `lang`.

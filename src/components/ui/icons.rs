@@ -10,9 +10,9 @@
 use dioxus::prelude::*;
 
 pub use dioxus_icons::lucide::{
-    Bell as IconBell, BellOff as IconBellOff, ChevronLeft as IconChevronLeft,
-    ChevronRight as IconChevronRight, Minus as IconMinus, Play as IconPlay, Square as IconSquare,
-    X as IconClose,
+    Bell as IconBell, BellOff as IconBellOff, Check as IconCheck, ChevronDown as IconChevronDown,
+    ChevronLeft as IconChevronLeft, ChevronRight as IconChevronRight, Minus as IconMinus,
+    Play as IconPlay, Search as IconSearch, Square as IconSquare, X as IconClose,
 };
 
 /// Ikon mosque — geometri persis `assets/mosque.svg` (desain multicolor),

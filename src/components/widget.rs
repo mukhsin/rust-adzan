@@ -74,6 +74,7 @@ pub fn WidgetApp() -> Element {
                         hari: hari,
                         tanggal: tanggal,
                         tanggal_hijri: tanggal_hijri,
+                        ramadan_day: crate::dates::ramadan_day(now.date_naive()),
                     }
                 },
                 None => rsx! {

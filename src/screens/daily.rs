@@ -44,6 +44,7 @@ pub fn DailyView() -> Element {
                             hari: hari,
                             tanggal: tanggal,
                             tanggal_hijri: tanggal_hijri,
+                            ramadan_day: dates::ramadan_day(now.date_naive()),
                         }
                     }
                     div { class: "w-[320px] h-[300px] flex flex-col gap-[18px]",

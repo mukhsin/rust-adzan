@@ -35,6 +35,7 @@ pub fn Ticket(
     hari: String,
     tanggal: String,
     tanggal_hijri: String,
+    ramadan_day: Option<u32>,
 ) -> Element {
     // Sholat berikutnya menentukan sorotan amber di papan jadwal.
     let (next_kind, _target) = prayer::next_prayer(&times, now);
@@ -42,9 +43,17 @@ pub fn Ticket(
     rsx! {
         div { class: "w-full h-full flex bg-pass overflow-hidden widget-holes",
             // KARTU UTAMA — identitas, hitung mundur, status.
-            CountdownPane { times: times, now: now, tz: tz, hari: hari, tanggal: tanggal, tanggal_hijri: tanggal_hijri }
+            CountdownPane {
+                times: times,
+                now: now,
+                tz: tz,
+                hari: hari,
+                tanggal: tanggal,
+                tanggal_hijri: tanggal_hijri,
+                ramadan_day: ramadan_day,
+            }
 
-            div { class: "w-6 shrink-0 flex flex-col items-center justify-between py-16",
+            div { class: "shrink-0 flex flex-col items-center justify-between py-16",
                 for _ in 0..5 {
                     span { class: "w-1 h-1 rounded-full bg-pass-line shrink-0" }
                 }
