@@ -96,7 +96,7 @@ mod tests {
     // Menjaga kedua varian ikon sinkron dengan assets/mosque.svg: jumlah
     // path dan geometri harus sama persis (warna boleh beda: currentColor
     // vs warna asli).
-    const MOSQUE_SVG: &str = include_str!("../../assets/mosque.svg");
+    const MOSQUE_SVG: &str = include_str!("../../../../assets/mosque.svg");
 
     #[test]
     fn geometri_mosque_dan_mosque_logo_sama() {

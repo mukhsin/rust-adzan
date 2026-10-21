@@ -1,18 +1,21 @@
-//! Window pengaturan — restyle dari design system "Jadwal Sholat
-//! Impeccable.pen": kartu grup putih (radius 14 + shadow lembut) di atas
-//! lembar hangat, baris setting setinggi 58px berpemisah hairline, kontrol
-//! Dropdown / Stepper / Sakelar / Tersegmen senada widget.
-//!
-//! Satu grup = satu komponen (`*Group`), tersusun dua kolom di
-//! `SettingsView`. Perubahan nilai lewat [`apply_settings`]: persist ke
-//! disk + sebar ke dom lain + refresh draft.
+//! Layar Pengaturan — enam grup komponen tersusun dua kolom ala frame
+//! "Pengaturan" design system pen. Satu grup = satu komponen di file ini;
+//! perubahan nilai lewat [`apply_settings`] (persist + sebar + refresh
+//! draft).
 
-use super::icons;
 use crate::autostart;
 use crate::cities::{CITIES, find_city};
 use crate::i18n::tr;
 use crate::settings::{CalcMethod, Language, MadhabChoice, Settings, Theme};
 use crate::state;
+use crate::ui::components::ui::button::{BTN, BTN_ICON};
+use crate::ui::components::ui::form::{INPUT, SELECT};
+use crate::ui::components::ui::group::{Group, Row};
+use crate::ui::components::ui::icons;
+use crate::ui::components::ui::modal::Modal;
+use crate::ui::components::ui::segmented::Segmented;
+use crate::ui::components::ui::stepper::Stepper;
+use crate::ui::components::ui::switch::Switch;
 use dioxus::prelude::*;
 use std::path::PathBuf;
 
@@ -21,14 +24,6 @@ const ZONA_WAKTU: [(&str, &str); 3] = [
     ("Asia/Makassar", "WITA — Makassar (UTC+8)"),
     ("Asia/Jayapura", "WIT — Jayapura (UTC+9)"),
 ];
-
-const SELECT: &str = "max-w-[210px] bg-pass border border-pass-line rounded-lg px-3 py-2 text-[13px] font-semibold text-ink outline-none focus:border-ink-3 transition-colors";
-const INPUT: &str = "w-24 bg-pass border border-pass-line rounded-lg px-3 py-2 text-[13px] font-semibold text-ink text-right outline-none focus:border-ink-3 transition-colors tabular-nums";
-// Tombol sekunder ala komponen "Tombol Sekunder" (pass + garis pass-line).
-const BTN: &str = "flex items-center gap-2 bg-pass border border-pass-line rounded-lg px-3 py-2 text-[13px] font-semibold text-ink hover:border-ink-3 transition-colors cursor-pointer";
-const BTN_ICON: &str = "p-2 bg-pass border border-pass-line rounded-lg text-ink-2 hover:border-ink-3 transition-colors cursor-pointer";
-const BTN_CONFIRM: &str = "px-3 py-2 rounded-lg text-[13px] font-semibold bg-ink text-on-ink hover:opacity-90 transition-opacity cursor-pointer";
-const BTN_DANGER: &str = "px-3 py-2 rounded-lg text-[13px] font-semibold bg-red-500 text-white hover:bg-red-600 transition-colors cursor-pointer";
 
 /// Jenis dialog modal yang sedang tampil.
 #[derive(Debug, Clone, PartialEq)]
@@ -63,7 +58,7 @@ pub fn SettingsView() -> Element {
     });
 
     rsx! {
-        div { class: "flex-1 px-4 flex flex-col gap-[18px] overflow-y-auto",
+        div { class: "flex-1 p-4 flex flex-col gap-[18px] overflow-y-auto",
 
             // Grup pengaturan dua kolom ala frame "Pengaturan" di design
             // system: kiri LOKASI + AUDIO, kanan PERHITUNGAN + TAMPILAN +
@@ -72,11 +67,11 @@ pub fn SettingsView() -> Element {
             div { class: "flex items-start gap-[18px]",
                 div { class: "flex-1 flex flex-col gap-[18px]",
                     LocationGroup { draft }
-                    CalculationGroup { draft }
-                    AppearanceGroup { draft }
+                    AudioGroup { draft, playing_umum, playing_subuh }
                 }
                 div { class: "flex-1 flex flex-col gap-[18px]",
-                    AudioGroup { draft, playing_umum, playing_subuh }
+                    CalculationGroup { draft }
+                    AppearanceGroup { draft }
                     NotificationGroup { draft }
                     MiscGroup { draft,
                         on_autostart_error: move |err: String| dialog.set(Dialog::AutostartError(err)),
@@ -505,161 +500,6 @@ fn MiscGroup(draft: Signal<Settings>, on_autostart_error: EventHandler<String>) 
                         }
                         Err(err) => on_autostart_error.call(err),
                     },
-                }
-            }
-        }
-    }
-}
-
-/// Kartu grup setting ala komponen "Grup Pengaturan": pass, radius 14,
-/// shadow lembut, label mono uppercase ink-3, padding [14, 26, 10, 26].
-#[component]
-fn Group(label: &'static str, children: Element) -> Element {
-    rsx! {
-        div { class: "bg-pass rounded-[14px] shadow-[0_8px_18px_#14161a1a] dark:shadow-[0_8px_18px_#00000080] px-[26px] pt-3.5 pb-2.5 flex flex-col",
-            div { class: "font-mono text-[11px] font-semibold tracking-[0.14em] uppercase text-ink-3 pb-1",
-                "{label}"
-            }
-            {children}
-        }
-    }
-}
-
-/// Baris setting ala komponen "Baris Pengaturan": kiri label + keterangan,
-/// kanan kontrol; pemisah hairline bawah (baris terakhir tanpa garis).
-/// Tinggi baris DIBUAT SERAGAM (58px) agar grup bersebelahan di kolom
-/// kiri/kanan sejajar.
-#[component]
-fn Row(label: &'static str, hint: Option<String>, children: Element) -> Element {
-    rsx! {
-        div { class: "flex items-center justify-between gap-3 h-[58px] shrink-0 border-b border-hairline last:border-b-0",
-            div { class: "flex flex-col gap-0.5 min-w-0",
-                span { class: "text-[13.5px] font-semibold text-ink", "{label}" }
-                if let Some(h) = hint {
-                    span { class: "text-[11.5px] text-ink-3 truncate", "{h}" }
-                }
-            }
-            div { class: "flex items-center gap-2 shrink-0",
-                {children}
-            }
-        }
-    }
-}
-
-/// Sakelar ala komponen "Sakelar" 36×20: isian ink saat nyala, kenop
-/// warna on-ink; mati = isian redup dengan kenop pass.
-#[component]
-fn Switch(checked: bool, on_change: EventHandler<bool>) -> Element {
-    rsx! {
-        button {
-            class: if checked {
-                "w-9 h-5 rounded-full bg-ink transition-colors relative shrink-0 cursor-pointer"
-            } else {
-                "w-9 h-5 rounded-full bg-ink-3/40 transition-colors relative shrink-0 cursor-pointer"
-            },
-            onclick: move |_| on_change.call(!checked),
-            span { class: if checked {
-                "absolute top-[2px] left-[18px] w-4 h-4 rounded-full bg-on-ink shadow transition-all"
-            } else {
-                "absolute top-[2px] left-[2px] w-4 h-4 rounded-full bg-pass shadow transition-all"
-            } }
-        }
-    }
-}
-
-/// Stepper ala komponen "Stepper": − nilai + dalam kotak bergaris pass-line.
-#[component]
-fn Stepper(value: u32, on_decrease: EventHandler<()>, on_increase: EventHandler<()>) -> Element {
-    let lang = state::settings().language;
-    rsx! {
-        div { class: "flex items-center gap-2.5 border border-pass-line rounded-lg px-2.5 py-[5px]",
-            button {
-                class: "font-mono text-[13px] font-semibold text-ink-2 hover:text-ink transition-colors cursor-pointer",
-                title: tr(lang, "dec"),
-                onclick: move |_| on_decrease.call(()),
-                "−"
-            }
-            span { class: "font-mono text-xs font-semibold text-ink tabular-nums text-center min-w-[64px]",
-                "{value} {tr(lang, \"unit_minutes\")}"
-            }
-            button {
-                class: "font-mono text-[13px] font-semibold text-ink-2 hover:text-ink transition-colors cursor-pointer",
-                title: tr(lang, "inc"),
-                onclick: move |_| on_increase.call(()),
-                "+"
-            }
-        }
-    }
-}
-
-/// Tersegmen ala komponen "Tersegmen": lajur board pill, segmen aktif ink
-/// dengan teks on-ink. Dipakai untuk pilihan pendek (tema, format jam,
-/// bahasa).
-#[component]
-fn Segmented(
-    options: Vec<(String, String)>,
-    active: String,
-    on_select: EventHandler<String>,
-) -> Element {
-    rsx! {
-        div { class: "flex items-center gap-0.5 bg-board rounded-full p-[3px]",
-            for (value, label) in options {
-                {
-                    let is_active = value == active;
-                    rsx! {
-                        button {
-                            class: if is_active {
-                                "px-3.5 py-[5px] rounded-full bg-ink text-on-ink text-[12.5px] font-bold transition-colors cursor-pointer"
-                            } else {
-                                "px-3.5 py-[5px] rounded-full text-[12.5px] font-semibold text-ink-2 hover:text-ink transition-colors cursor-pointer"
-                            },
-                            onclick: move |_| on_select.call(value.clone()),
-                            "{label}"
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-/// Modal dialog bertema aplikasi (pengganti dialog OS yang jelek di tema gelap).
-/// Klik backdrop atau tombol batal = tutup tanpa aksi.
-#[component]
-fn Modal(
-    title: String,
-    message: String,
-    confirm_text: String,
-    danger: bool,
-    show_cancel: bool,
-    on_confirm: EventHandler<()>,
-    on_cancel: EventHandler<()>,
-) -> Element {
-    let lang = state::settings().language;
-    rsx! {
-        div {
-            // Scrim gelap di KEDUA tema — bg-ink/60 akan jadi putih di tema
-            // gelap karena ink terbalik (#ece9e2).
-            class: "fixed inset-0 z-50 flex items-center justify-center bg-black/60",
-            onclick: move |_| on_cancel.call(()),
-            div {
-                class: "w-80 bg-pass border border-pass-line rounded-[14px] p-5 shadow-[0_8px_18px_#14161a1a] dark:shadow-[0_8px_18px_#00000080] flex flex-col gap-2",
-                onclick: move |e| e.stop_propagation(),
-                h2 { class: "text-sm font-semibold text-ink", "{title}" }
-                p { class: "text-xs text-ink-2 leading-relaxed", "{message}" }
-                div { class: "flex justify-end gap-2 mt-3",
-                    if show_cancel {
-                        button {
-                            class: "{BTN}",
-                            onclick: move |_| on_cancel.call(()),
-                            "{tr(lang, \"cancel\")}"
-                        }
-                    }
-                    button {
-                        class: if danger { "{BTN_DANGER}" } else { "{BTN_CONFIRM}" },
-                        onclick: move |_| on_confirm.call(()),
-                        "{confirm_text}"
-                    }
                 }
             }
         }
