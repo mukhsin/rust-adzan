@@ -24,8 +24,11 @@ struct Row {
 pub fn PrayerTable(times: DayTimes, now: NaiveTime, next_kind: PrayerKind) -> Element {
     let lang = state::settings().language;
     let settings = state::settings();
-    // Setelah Isya (menuju Subuh esok), sorotan tetap di baris Isya.
-    let highlight_isya = next_kind == PrayerKind::Subuh && now > times.isya;
+    // Setelah Isya, sholat berikutnya adalah Subuh ESOK: baris Subuh disorot
+    // dan menampilkan jadwal esok — konsisten dengan pane countdown kiri.
+    // Antara tengah malam sampai Subuh, Subuh hari ini belum lewat sehingga
+    // kondisi ini false dan baris memakai jadwal hari ini.
+    let menuju_subuh_esok = next_kind == PrayerKind::Subuh && now > times.subuh;
     // "Lewati adzan berikutnya" (tray) aktif → lonceng sholat berikutnya
     // tampil off, konsisten dengan centang di menu tray.
     let skip_aktif = state::skip_next_armed();
@@ -69,32 +72,26 @@ pub fn PrayerTable(times: DayTimes, now: NaiveTime, next_kind: PrayerKind) -> El
     ];
 
     // Index baris "berikutnya" (disorot amber) — dipakai untuk is_before_next.
-    let next_index = rows.iter().position(|row| match row.kind {
-        Some(k) => {
-            (k == next_kind && !highlight_isya)
-                || (row.kind == Some(PrayerKind::Isya) && highlight_isya)
-        }
-        None => false,
-    });
+    let next_index = rows.iter().position(|row| row.kind == Some(next_kind));
 
     rsx! {
         div { class: "flex-1",
             div { class: "flex flex-col p-4 pl-6 h-full",
                 for (i, row) in rows.iter().enumerate() {
                     {
-                        let is_next = match row.kind {
-                            Some(k) => {
-                                (k == next_kind && !highlight_isya)
-                                    || (row.kind == Some(PrayerKind::Isya) && highlight_isya)
-                            }
-                            None => false,
+                        let is_next = row.kind == Some(next_kind);
+                        // Subuh esok menimpa jam baris Subuh saat menuju-subuh-esok.
+                        let waktu = if menuju_subuh_esok && row.kind == Some(PrayerKind::Subuh) {
+                            times.subuh_esok
+                        } else {
+                            row.time
                         };
                         // Baris terakhir tanpa garis bawah.
                         let is_last = i == rows.len() - 1;
                         // Baris tepat di atas sorotan amber — juga tanpa garis
                         // bawah supaya sorotan punya ruang bersih di atasnya.
                         let is_before_next = next_index.is_some_and(|nx| i + 1 == nx);
-                        let is_lewat = !is_next && now > row.time;
+                        let is_lewat = !is_next && now > waktu;
                         let nama = tr(lang, row.key);
 
                         let name_class = if is_next {
@@ -147,7 +144,7 @@ pub fn PrayerTable(times: DayTimes, now: NaiveTime, next_kind: PrayerKind) -> El
                                     if let Some(kind) = row.kind {
                                         BellRow { kind: kind, color: bell_color, nama: nama, muted: muted, skip: skip }
                                     }
-                                    span { class: "{time_class}", "{prayer::format_time(row.time, settings.time_format_24)}" }
+                                    span { class: "{time_class}", "{prayer::format_time(waktu, settings.time_format_24)}" }
                                 }
                             }
                         }
