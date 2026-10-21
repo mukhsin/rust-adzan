@@ -2,13 +2,13 @@
 //! brand + tab kiri, kontrol jendela (minimize / maximize / close) kanan.
 //! Seluruh bar bisa dipakai drag window; tab & tombol tidak ikut drag.
 
+use crate::components::ui::icons;
 use crate::i18n::tr;
 use crate::state;
-use crate::ui::components::ui::icons;
 use dioxus::prelude::*;
 
 /// Tab aplikasi pada bar atas (design system pen). Layar Bulanan & Kalender
-/// menyusul — lihat placeholder di `crate::ui::app`.
+/// menyusul — lihat placeholder di `crate::layouts::app`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Tab {
     Harian,
@@ -22,7 +22,7 @@ pub enum Tab {
 pub fn TitleBar(tab: Tab, on_select_tab: EventHandler<Tab>) -> Element {
     let lang = state::settings().language;
     let tabs = [
-        (Tab::Harian, tr(lang, "tab_daily")),
+        // (Tab::Harian, tr(lang, "tab_daily")),
         (Tab::Bulanan, tr(lang, "tab_monthly")),
         (Tab::Kalender, tr(lang, "tab_kalender")),
         (Tab::Pengaturan, tr(lang, "settings_title")),
