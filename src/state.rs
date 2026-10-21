@@ -1,14 +1,54 @@
 use crate::settings::Settings;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, OnceLock, RwLock};
 
 /// Settings global yang dibagikan antara UI utama, widget, dan scheduler thread.
 static SETTINGS: OnceLock<RwLock<Arc<Settings>>> = OnceLock::new();
 
-/// Perintah UI lintas window (dari dom widget → dom utama).
+/// Permintaan "lewati adzan berikutnya" (menu tray): scheduler membuang
+/// audio + toast masuk waktu pada pemicu adzan berikutnya sekali. Statusnya
+/// terlihat di dua tempat: centang item tray dan lonceng-off papan jadwal
+/// untuk sholat berikutnya.
+static SKIP_NEXT_ADZAN: AtomicBool = AtomicBool::new(false);
+
+pub fn request_skip_next_adzan() {
+    SKIP_NEXT_ADZAN.store(true, Ordering::Relaxed);
+}
+
+/// Batalkan permintaan skip sebelum sempat terpakai.
+pub fn cancel_skip_next_adzan() {
+    SKIP_NEXT_ADZAN.store(false, Ordering::Relaxed);
+}
+
+/// Sedang armed (dipakai papan jadwal & tray tiap render).
+pub fn skip_next_armed() -> bool {
+    SKIP_NEXT_ADZAN.load(Ordering::Relaxed)
+}
+
+/// Ambil sekaligus kosongkan permintaan skip (sekali pakai).
+pub fn take_skip_next_adzan() -> bool {
+    SKIP_NEXT_ADZAN.swap(false, Ordering::Relaxed)
+}
+
+/// Set centang item tray "Lewati adzan berikutnya" (main thread saja —
+/// item muda tidak Send). Pelepasan saat skip tidak aktif datang lewat
+/// [`MainCommand::SkipInactive`].
+pub fn set_tray_skip_checked(checked: bool) {
+    TRAY_SKIP_ITEM.with(|cell| {
+        if let Some(item) = cell.borrow().as_ref() {
+            item.set_checked(checked);
+        }
+    });
+}
+
+/// Perintah UI lintas window (dari dom widget / thread scheduler → dom utama).
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum MainCommand {
     /// Sembunyikan widget dan tampilkan window utama.
     ShowMain,
+    /// Lepas centang "Lewati adzan berikutnya" di tray — skip sudah tidak
+    /// aktif (terkonsumsi scheduler atau dibatalkan dari papan jadwal).
+    SkipInactive,
 }
 
 static MAIN_CMD_TX: OnceLock<tokio::sync::mpsc::UnboundedSender<MainCommand>> = OnceLock::new();
@@ -42,6 +82,11 @@ thread_local! {
 
     /// Handle item "Tampilkan Jendela" di tray — teksnya diganti saat bahasa UI berubah.
     pub static TRAY_SHOW_ITEM: std::cell::RefCell<Option<dioxus::desktop::trayicon::menu::MenuItem>>
+        = const { std::cell::RefCell::new(None) };
+
+    /// Handle CheckMenuItem "Lewati adzan berikutnya" di tray — teksnya
+    /// diganti saat bahasa UI berubah; centangnya mengikuti status armed.
+    pub static TRAY_SKIP_ITEM: std::cell::RefCell<Option<dioxus::desktop::trayicon::menu::CheckMenuItem>>
         = const { std::cell::RefCell::new(None) };
 
     /// Handle item "Keluar" di tray — teksnya diganti saat bahasa UI berubah.

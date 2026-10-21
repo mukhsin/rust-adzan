@@ -281,6 +281,57 @@ const PHRASES: &[(&str, &str, &str)] = &[
         "Tidak bisa menghubungi GitHub — periksa koneksi internet.",
         "Could not reach GitHub — check your internet connection.",
     ),
+    // Layar Harian — tanggal penting & kiblat
+    ("sec_dates", "Tanggal Penting", "Important Dates"),
+    (
+        "days_until_ramadan",
+        "{n} hari menuju Ramadhan",
+        "{n} days until Ramadan",
+    ),
+    (
+        "ramadan_day",
+        "Hari ke-{n} Ramadhan {year} H",
+        "Day {n} of Ramadan {year} AH",
+    ),
+    ("in_days", "{n} hari lagi", "in {n} days"),
+    ("sec_qibla", "Arah Kiblat", "Qibla Direction"),
+    ("qibla_from_north", "dari utara sejati", "from true north"),
+    ("dir_n", "Utara", "North"),
+    ("dir_ne", "Timur Laut", "Northeast"),
+    ("dir_e", "Timur", "East"),
+    ("dir_se", "Tenggara", "Southeast"),
+    ("dir_s", "Selatan", "South"),
+    ("dir_sw", "Barat Daya", "Southwest"),
+    ("dir_w", "Barat", "West"),
+    ("dir_nw", "Barat Laut", "Northwest"),
+    // Nama peristiwa penting kalender Islam
+    ("ev_tahun_baru", "Tahun Baru Islam", "Islamic New Year"),
+    ("ev_maulid", "Maulid Nabi", "Mawlid an-Nabi"),
+    ("ev_isra_miraj", "Isra Mi'raj", "Isra and Mi'raj"),
+    ("ev_awal_ramadan", "Awal Ramadhan", "First of Ramadan"),
+    ("ev_idul_fitri", "Idul Fitri", "Eid al-Fitr"),
+    ("ev_idul_adha", "Idul Adha", "Eid al-Adha"),
+    // Tray — lewati adzan berikutnya
+    (
+        "menu_skip_next",
+        "Lewati adzan berikutnya",
+        "Skip next adhan",
+    ),
+    (
+        "skip_next_toast",
+        "Adzan berikutnya akan dilewati.",
+        "The next adhan will be skipped.",
+    ),
+    (
+        "skip_next_cancel_toast",
+        "Lewati adzan dibatalkan.",
+        "Adhan skip cancelled.",
+    ),
+    (
+        "bell_skip_title",
+        "Adzan {nama} akan dilewati — klik untuk membatalkan",
+        "{nama} adhan will be skipped — click to cancel",
+    ),
 ];
 
 /// Ambil terjemahan `key` untuk `lang`.

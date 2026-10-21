@@ -41,6 +41,9 @@ pub fn app() -> Element {
                     state::MainCommand::ShowMain => {
                         window::show_main();
                     }
+                    state::MainCommand::SkipInactive => {
+                        state::set_tray_skip_checked(false);
+                    }
                 }
             }
         }

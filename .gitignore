@@ -6,3 +6,6 @@
 /.zcode
 node_modules/
 *.log
+
+# hasil generate `just css` — ter-embed via include_str!, regen otomatis via justfile
+assets/tailwind.css

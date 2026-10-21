@@ -25,6 +25,9 @@ pub fn PrayerTable(times: DayTimes, now: NaiveTime, next_kind: PrayerKind) -> El
     let settings = state::settings();
     // Setelah Isya (menuju Subuh esok), sorotan tetap di baris Isya.
     let highlight_isya = next_kind == PrayerKind::Subuh && now > times.isya;
+    // "Lewati adzan berikutnya" (tray) aktif → lonceng sholat berikutnya
+    // tampil off, konsisten dengan centang di menu tray.
+    let skip_aktif = state::skip_next_armed();
 
     let rows = [
         Row {
@@ -116,10 +119,13 @@ pub fn PrayerTable(times: DayTimes, now: NaiveTime, next_kind: PrayerKind) -> El
                         };
                         // State mute dibaca di sini (bukan di dalam BellRow):
                         // komponen dengan props yang sama tidak di-render ulang
-                        // dioxus, jadi flip ikon butuh perubahan props.
+                        // dioxus, jadi flip ikon butuh perubahan props. Lonceng
+                        // sholat berikutnya ikut tampil off saat skip armed —
+                        // dipisah dari `muted` karena kliknya beda makna.
                         let muted = row
                             .kind
                             .is_some_and(|k| settings.muted_prayers.contains(&k));
+                        let skip = skip_aktif && row.kind.is_some_and(|k| k == next_kind);
 
                         rsx! {
                             div {
@@ -138,7 +144,7 @@ pub fn PrayerTable(times: DayTimes, now: NaiveTime, next_kind: PrayerKind) -> El
                                 }
                                 div { class: "flex items-center gap-3 shrink-0",
                                     if let Some(kind) = row.kind {
-                                        BellRow { kind: kind, color: bell_color, nama: nama, muted: muted }
+                                        BellRow { kind: kind, color: bell_color, nama: nama, muted: muted, skip: skip }
                                     }
                                     span { class: "{time_class}", "{prayer::format_time(row.time, settings.time_format_24)}" }
                                 }
@@ -153,15 +159,25 @@ pub fn PrayerTable(times: DayTimes, now: NaiveTime, next_kind: PrayerKind) -> El
 
 /// Lonceng satu baris jadwal — hanya sholat wajib (Imsak/Terbit tidak
 /// dirender sama sekali). Klik = flip ikon INSTAN (optimistis), lalu
-/// penulisan settings & persistensi berjalan di belakang.
+/// penulisan settings & persistensi berjalan di belakang. `skip` true saat
+/// adzan baris ini ditarget "lewati adzan berikutnya" (tray): ikon tampil
+/// off dan kliknya MEMBATALKAN skip, bukan mengubah mute.
 #[component]
-fn BellRow(kind: PrayerKind, color: &'static str, nama: String, muted: bool) -> Element {
+fn BellRow(
+    kind: PrayerKind,
+    color: &'static str,
+    nama: String,
+    muted: bool,
+    skip: bool,
+) -> Element {
     let lang = state::settings().language;
     // State tampilan lokal: sumber kebenaran ikon, disinkronkan dari prop
     // saat mount. Props di luar widget tidak mengubah mute, jadi aman.
     let mut shown = use_signal(|| muted);
 
-    let title = if *shown.read() {
+    let title = if skip {
+        tr(lang, "bell_skip_title").replace("{nama}", &nama)
+    } else if *shown.read() {
         tr(lang, "bell_off_title").replace("{nama}", &nama)
     } else {
         tr(lang, "bell_on_title").replace("{nama}", &nama)
@@ -175,12 +191,26 @@ fn BellRow(kind: PrayerKind, color: &'static str, nama: String, muted: bool) -> 
             onmousedown: move |e| e.stop_propagation(),
             ondoubleclick: move |e| e.stop_propagation(),
             onclick: move |_| {
-                shown.toggle();
-                spawn(async move {
-                    toggle_adzan_mute(kind);
-                });
+                if skip {
+                    // Klik lonceng yang off karena skip = batalkan skip.
+                    shown.set(false);
+                    spawn(async move {
+                        crate::state::cancel_skip_next_adzan();
+                        // Item tray hanya bisa disentuh main thread — lewat
+                        // channel perintah dom utama.
+                        crate::state::send_main_command(
+                            crate::state::MainCommand::SkipInactive,
+                        );
+                        crate::logger::info("lewati adzan dibatalkan (papan jadwal)");
+                    });
+                } else {
+                    shown.toggle();
+                    spawn(async move {
+                        toggle_adzan_mute(kind);
+                    });
+                }
             },
-            if *shown.read() {
+            if *shown.read() || skip {
                 icons::IconBellOff { class: "w-3 h-3" }
             } else {
                 icons::IconBell { class: "w-3 h-3" }

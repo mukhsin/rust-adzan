@@ -6,26 +6,27 @@ default:
     @just --list
 
 # jalankan aplikasi mode dev dengan hot-reload (butuh dioxus-cli)
-dev:
+dev: css
     dx serve
 
 # compile + jalankan aplikasi sekali tanpa hot-reload
-run:
+run: css
     cargo run
 
 # cek cepat apakah kode compile (tanpa menghasilkan binary)
-check:
+check: css
     cargo check
 
 # build versi debug
-build:
+build: css
     cargo build
 
 # build versi release (opt-level "s" + LTO)
-release:
+release: css
     cargo build --release
 
-# regenerate assets/tailwind.css dari assets/input.css (butuh node/npm)
+# regenerate assets/tailwind.css bila basah/hilang (hasil generate TIDAK
+# di-track git; regen butuh bunx). Skrip sendiri yang memutuskan skip.
 css:
     bash tools/build-css.sh
 
@@ -34,7 +35,7 @@ icon:
     cargo run --bin gen-icon
 
 # build installer NSIS ringan (WebView2 diunduh saat instalasi)
-bundle:
+bundle: css
     cargo build --release
     mkdir -p target/nsis
     MSYS_NO_PATHCONV=1 "$USERPROFILE/.dx/tools/nsis-3.11/Bin/makensis.exe" \
@@ -45,11 +46,11 @@ bundle:
       tools/installer.nsi
 
 # jalankan semua unit test (prayer, scheduler, dll)
-test:
+test: css
     cargo test
 
 # jalankan satu test berdasarkan nama, contoh: just test-one next_prayer
-test-one name:
+test-one name: css
     cargo test {{name}}
 
 # format semua kode
@@ -61,7 +62,7 @@ fmt-check:
     cargo fmt --check
 
 # linter clippy
-clippy:
+clippy: css
     cargo clippy --all-targets
 
 # fmt-check + clippy + test sekaligus (simulasi CI sebelum commit/push)
@@ -69,7 +70,7 @@ verify: fmt-check clippy test
     @echo "Semua cek lolos, aman untuk commit."
 
 # buka dokumentasi API project di browser
-doc:
+doc: css
     cargo doc --no-deps --open
 
 # bersihkan hasil build

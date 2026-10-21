@@ -22,3 +22,8 @@
 - Countdown lintas tengah malam (Subuh esok) wajib pakai
   `prayer::time_until` (koreksi +86400); scheduler trigger 2 detik memakai
   selisih mentah hari-yang-sama (jangan tertukar).
+- `assets/tailwind.css` hasil generate (`just css` dari `assets/input.css`,
+  ter-embed via `include_str!` di `layouts`) dan TIDAK di-track git. Resep
+  `css` adalah dependency resep-resep compile di justfile; skrip skip regen
+  bila hasil masih segar. Ganti class di rsx → regen otomatis saat `just`
+  berikutnya; regen butuh bunx (bun).

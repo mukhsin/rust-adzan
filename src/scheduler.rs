@@ -124,8 +124,30 @@ pub fn start() {
             loop {
                 let settings = crate::state::settings();
                 let now = now_in_tz(&settings);
-                for action in tick(&mut state, &settings, now) {
-                    execute(action, &settings);
+                let actions = tick(&mut state, &settings, now);
+
+                // "Lewati adzan berikutnya" (menu tray): buang audio + toast
+                // masuk waktu pada event pemicu adzan yang sedang terjadi.
+                // Flag tidak dikonsumsi oleh NotifyPre/NotifyImsak, dan tetap
+                // tersimpan bila event ini di-mute (tanpa aksi adzan sama
+                // sekali) — berlaku untuk adzan berikutnya yang benar-benar
+                // membunyikan.
+                let ada_adzan = actions
+                    .iter()
+                    .any(|a| matches!(a, Action::PlayAdzan(_) | Action::NotifyAdzan(_)));
+                let lewati = ada_adzan && crate::state::take_skip_next_adzan();
+                if lewati {
+                    crate::logger::info("adzan dilewati (permintaan menu tray)");
+                    // Lepas centang tray: item muda hanya bisa disentuh main
+                    // thread, jadi lewat channel perintah dom utama.
+                    crate::state::send_main_command(crate::state::MainCommand::SkipInactive);
+                }
+
+                for action in actions {
+                    match action {
+                        Action::PlayAdzan(_) | Action::NotifyAdzan(_) if lewati => {}
+                        other => execute(other, &settings),
+                    }
                 }
                 std::thread::sleep(std::time::Duration::from_secs(1));
             }

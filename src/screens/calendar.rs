@@ -174,7 +174,11 @@ pub fn CalendarView() -> Element {
                                 let is_today = date == today;
                                 let weekday = date.weekday().num_days_from_sunday() as usize;
                                 let (h_y, h_m, h_d) = hijri::to_hijri(date);
-                                let _ = (h_y, h_m);
+                                // Penanda tanggal penting Islam (1 Ramadhan,
+                                // Idul Fitri, dst.) dari tanggal hijriah sel.
+                                let acara = crate::dates::by_hijri(h_m, h_d)
+                                    .map(|kind| tr(lang, kind.key()));
+                                let _ = h_y;
                                 let weton_tgl = h_d;
                                 let pasaran = PASARAN[pasaran_index(date)];
                                 let neptu = NEPTU_HARI[weekday]
@@ -216,6 +220,15 @@ pub fn CalendarView() -> Element {
                                 }
                                 let hijriah = arabic_numerals(h_d);
                                 let pasaran_nama = pasaran.to_uppercase();
+                                // Label peristiwa: amber saat dalam bulan
+                                // (dibaca), redup saat out-month. Pakai
+                                // text-amber (bukan amber-ink) agar terbaca
+                                // di tema gelap.
+                                let acara_class = if in_month {
+                                    "text-[9px] font-bold uppercase tracking-wide text-amber truncate max-w-full"
+                                } else {
+                                    "text-[9px] font-bold uppercase tracking-wide text-board-dim truncate max-w-full"
+                                };
 
                                 rsx! {
                                     div { class: "{cell_class}",
@@ -225,8 +238,11 @@ pub fn CalendarView() -> Element {
                                                 "{hijriah}"
                                             }
                                         }
-                                        div { class: "flex-1 flex items-center justify-center",
+                                        div { class: "flex-1 flex flex-col items-center justify-center gap-[3px] min-w-0",
                                             span { class: "{masehi_class}", "{date.day()}" }
+                                            if let Some(nama) = &acara {
+                                                span { class: "{acara_class}", title: "{nama}", "{nama}" }
+                                            }
                                         }
                                         div { class: "h-[13px] flex items-center justify-between",
                                             span { class: "{weton_class}", "{weton_tgl}" }
@@ -259,6 +275,14 @@ pub fn CalendarView() -> Element {
                     span { class: "w-[7px] h-[7px] rounded-full bg-jumat" }
                     span { class: "font-mono text-[9.5px] font-semibold uppercase text-ink-2",
                         "{day_name(lang, 4)}"
+                    }
+                }
+                div { class: "flex items-center gap-[7px]",
+                    span { class: "font-mono text-[9.5px] font-bold uppercase text-amber",
+                        "1 Ram"
+                    }
+                    span { class: "font-mono text-[9.5px] font-semibold uppercase text-ink-2",
+                        "{tr(lang, \"sec_dates\")}"
                     }
                 }
             }

@@ -7,10 +7,8 @@ use crate::i18n::tr;
 use crate::state;
 use dioxus::prelude::*;
 
-/// Tab aplikasi pada bar atas (design system pen). Layar Bulanan & Kalender
-/// menyusul — lihat placeholder di `crate::layouts::app`.
+/// Tab aplikasi pada bar atas (design system pen).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[allow(dead_code)] // Harian sementara nonaktif (tab di-comment)
 pub enum Tab {
     Harian,
     Bulanan,
@@ -23,7 +21,7 @@ pub enum Tab {
 pub fn TitleBar(tab: Tab, on_select_tab: EventHandler<Tab>) -> Element {
     let lang = state::settings().language;
     let tabs = [
-        // (Tab::Harian, tr(lang, "tab_daily")),
+        (Tab::Harian, tr(lang, "tab_daily")),
         (Tab::Bulanan, tr(lang, "tab_monthly")),
         (Tab::Kalender, tr(lang, "tab_kalender")),
         (Tab::Pengaturan, tr(lang, "settings_title")),

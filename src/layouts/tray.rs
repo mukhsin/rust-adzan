@@ -18,6 +18,13 @@ pub fn TraySetup() -> Element {
         let lang = state::settings().language;
         let menu = dioxus::desktop::trayicon::menu::Menu::new();
         let show = MenuItem::with_id("show", crate::i18n::tr(lang, "menu_show"), true, None);
+        let skip_next = CheckMenuItem::with_id(
+            "skip_next",
+            crate::i18n::tr(lang, "menu_skip_next"),
+            true,
+            false,
+            None,
+        );
         let widget = CheckMenuItem::with_id(
             "widget",
             crate::i18n::tr(lang, "menu_widget"),
@@ -29,6 +36,7 @@ pub fn TraySetup() -> Element {
         menu.append_items(&[
             &show,
             &PredefinedMenuItem::separator(),
+            &skip_next,
             &widget,
             &PredefinedMenuItem::separator(),
             &quit,
@@ -51,6 +59,7 @@ pub fn TraySetup() -> Element {
         provide_context(tray);
         state::WIDGET_MENU_ITEM.with(|cell| *cell.borrow_mut() = Some(widget));
         state::TRAY_SHOW_ITEM.with(|cell| *cell.borrow_mut() = Some(show));
+        state::TRAY_SKIP_ITEM.with(|cell| *cell.borrow_mut() = Some(skip_next));
         state::TRAY_QUIT_ITEM.with(|cell| *cell.borrow_mut() = Some(quit));
         TRAY_LANG.with(|cell| cell.set(Some(lang)));
     });
@@ -83,6 +92,29 @@ pub fn TraySetup() -> Element {
     use_muda_event_handler(move |event| match event.id().0.as_str() {
         "show" => window::show_main(),
         "widget" => window::toggle_widget(),
+        "skip_next" => {
+            let lang = state::settings().language;
+            // Toggle: centang = skip armed; lepas centang = batal. Muda
+            // otomatis membalik centang saat klik — set eksplisit agar
+            // visual selalu mengikuti flag sumber kebenaran.
+            if state::skip_next_armed() {
+                state::cancel_skip_next_adzan();
+                state::set_tray_skip_checked(false);
+                crate::notify::show(
+                    crate::settings::APP_NAME,
+                    crate::i18n::tr(lang, "skip_next_cancel_toast"),
+                );
+                crate::logger::info("lewati adzan berikutnya dibatalkan (menu tray)");
+            } else {
+                state::request_skip_next_adzan();
+                state::set_tray_skip_checked(true);
+                crate::notify::show(
+                    crate::settings::APP_NAME,
+                    crate::i18n::tr(lang, "skip_next_toast"),
+                );
+                crate::logger::info("adzan berikutnya akan dilewati (menu tray)");
+            }
+        }
         "quit" => {
             if let Some(tray) = &tray {
                 let _ = tray.set_visible(false);
@@ -124,6 +156,11 @@ fn sync_tray_language(lang: crate::settings::Language) {
     state::TRAY_SHOW_ITEM.with(|cell| {
         if let Some(item) = cell.borrow().as_ref() {
             item.set_text(tr(lang, "menu_show"));
+        }
+    });
+    state::TRAY_SKIP_ITEM.with(|cell| {
+        if let Some(item) = cell.borrow().as_ref() {
+            item.set_text(tr(lang, "menu_skip_next"));
         }
     });
     state::TRAY_QUIT_ITEM.with(|cell| {
