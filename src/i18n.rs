@@ -20,6 +20,10 @@ const PHRASES: &[(&str, &str, &str)] = &[
     ("tab_kalender", "Kalender", "Calendar"),
     ("tab_tentang", "Tentang", "About"),
     ("coming_soon", "Belum tersedia", "Not available yet"),
+    ("col_tgl", "Tgl", "Date"),
+    ("today", "Hari ini", "Today"),
+    ("prev_month", "Bulan sebelumnya", "Previous month"),
+    ("next_month", "Bulan berikutnya", "Next month"),
     (
         "close_hint",
         "Tutup (tetap berjalan di tray)",

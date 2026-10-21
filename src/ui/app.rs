@@ -3,7 +3,9 @@
 
 use crate::state;
 use crate::ui::components::title_bar::{Tab, TitleBar};
-use crate::ui::screens::{about::AboutView, daily::DailyView, settings::SettingsView};
+use crate::ui::screens::{
+    about::AboutView, daily::DailyView, monthly::MonthlyView, settings::SettingsView,
+};
 use crate::ui::tray::TraySetup;
 use crate::ui::window;
 use dioxus::prelude::*;
@@ -88,7 +90,8 @@ pub fn app() -> Element {
                 Tab::Pengaturan => rsx! { SettingsView {} },
                 Tab::Tentang => rsx! { AboutView {} },
                 Tab::Harian => rsx! { DailyView {} },
-                Tab::Bulanan | Tab::Kalender => rsx! {
+                Tab::Bulanan => rsx! { MonthlyView {} },
+                Tab::Kalender => rsx! {
                     div { class: "flex-1 flex items-center justify-center",
                         span { class: "font-mono text-xs font-semibold tracking-[0.14em] uppercase text-ink-3",
                             "{tr(lang, \"coming_soon\")}"
