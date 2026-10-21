@@ -24,6 +24,8 @@ fn main() {
 
     // Muat settings ke global + nyalakan engine adzan (thread terpisah).
     let _ = state::settings();
+    // Identitas toast (AUMID): supaya notifikasi memakai nama + ikon aplikasi.
+    notify::ensure_aumid_registered();
     scheduler::start();
     logger::info("aplikasi dimulai");
 
