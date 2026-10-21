@@ -94,18 +94,18 @@ pub fn PrayerTable(times: DayTimes, now: NaiveTime, next_kind: PrayerKind) -> El
                         let nama = tr(lang, row.key);
 
                         let name_class = if is_next {
-                            "text-xs font-bold text-amber-ink"
+                            "text-xs uppercase font-count font-bold text-amber-ink"
                         } else if is_lewat {
-                            "text-xs text-ink-3"
+                            "text-xs uppercase font-count font-medium text-ink-3"
                         } else {
-                            "text-xs text-ink-2"
+                            "text-xs uppercase font-count font-medium text-ink-2"
                         };
                         let time_class = if is_next {
-                            "font-mono text-[13px] font-semibold tabular-nums text-amber-ink"
+                            "text-[13px] font-count font-semibold tabular-nums text-amber-ink"
                         } else if is_lewat {
-                            "font-mono text-[13px] font-medium tabular-nums text-ink-3"
+                            "text-[13px] font-count font-medium tabular-nums text-ink-3"
                         } else {
-                            "font-mono text-[13px] font-medium tabular-nums text-board-text"
+                            "text-[13px] font-count font-medium tabular-nums text-board-text"
                         };
                         let bell_color: &'static str = if is_next {
                             "text-amber-ink"
