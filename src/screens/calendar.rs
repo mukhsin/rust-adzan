@@ -9,6 +9,7 @@
 //! dan Neptu = neptu hari + neptu pasaran.
 
 use crate::components::ui::icons;
+use crate::components::ui::tooltip::{PosisiTooltip, Tooltip};
 use crate::hijri;
 use crate::i18n::{day_name, hijri_month_name, month_name, tr};
 use crate::prayer;
@@ -89,26 +90,28 @@ pub fn CalendarView() -> Element {
             // Kepala kalender: navigasi + judul + rentang hijriah + hari ini.
             div { class: "flex items-center gap-4 px-1 py-1",
                 div { class: "flex items-center gap-3.5",
-                    button {
-                        class: "p-1 -m-1 rounded-md text-ink-2 hover:text-ink transition-colors cursor-pointer",
-                        title: tr(lang, "prev_month"),
-                        onclick: move |_| {
-                            let (y, m) = bulan();
-                            bulan.set(if m == 1 { (y - 1, 12) } else { (y, m - 1) });
-                        },
-                        icons::IconChevronLeft { class: "w-5 h-5" }
+                    Tooltip { label: tr(lang, "prev_month").to_string(), posisi: PosisiTooltip::Bawah,
+                        button {
+                            class: "p-1 -m-1 rounded-md text-ink-2 hover:text-ink transition-colors cursor-pointer",
+                            onclick: move |_| {
+                                let (y, m) = bulan();
+                                bulan.set(if m == 1 { (y - 1, 12) } else { (y, m - 1) });
+                            },
+                            icons::IconChevronLeft { class: "w-5 h-5" }
+                        }
                     }
                     span { class: "text-[21px] font-bold tracking-wide uppercase text-ink",
                         "{bulan_label}"
                     }
-                    button {
-                        class: "p-1 -m-1 rounded-md text-ink-2 hover:text-ink transition-colors cursor-pointer",
-                        title: tr(lang, "next_month"),
-                        onclick: move |_| {
-                            let (y, m) = bulan();
-                            bulan.set(if m == 12 { (y + 1, 1) } else { (y, m + 1) });
-                        },
-                        icons::IconChevronRight { class: "w-5 h-5" }
+                    Tooltip { label: tr(lang, "next_month").to_string(), posisi: PosisiTooltip::Bawah,
+                        button {
+                            class: "p-1 -m-1 rounded-md text-ink-2 hover:text-ink transition-colors cursor-pointer",
+                            onclick: move |_| {
+                                let (y, m) = bulan();
+                                bulan.set(if m == 12 { (y + 1, 1) } else { (y, m + 1) });
+                            },
+                            icons::IconChevronRight { class: "w-5 h-5" }
+                        }
                     }
                 }
                 div { class: "flex-1" }
@@ -241,7 +244,9 @@ pub fn CalendarView() -> Element {
                                         div { class: "flex-1 flex flex-col items-center justify-center gap-[3px] min-w-0",
                                             span { class: "{masehi_class}", "{date.day()}" }
                                             if let Some(nama) = &acara {
-                                                span { class: "{acara_class}", title: "{nama}", "{nama}" }
+                                                Tooltip { label: nama.clone(), posisi: PosisiTooltip::Atas,
+                                                    span { class: "{acara_class}", "{nama}" }
+                                                }
                                             }
                                         }
                                         div { class: "h-[13px] flex items-center justify-between",

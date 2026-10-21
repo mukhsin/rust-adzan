@@ -108,7 +108,6 @@ fn DatesCard(today: NaiveDate) -> Element {
                             div { class: "flex items-center justify-between gap-2 py-[5px] border-t border-hairline first:border-t-0",
                                 div { class: "flex items-center gap-2 min-w-0",
                                     span { class: "text-[12.5px] font-semibold text-ink-2 truncate",
-                                        title: "{nama}",
                                         "{nama}"
                                     }
                                     span { class: "font-mono text-[10px] text-ink-3", "{tanggal}" }

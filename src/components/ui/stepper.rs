@@ -1,5 +1,9 @@
 //! Stepper ala komponen "Stepper": − nilai + dalam kotak bergaris pass-line.
+//! Tombol −/+ memakai tooltip custom design system pen (bukan `title`
+//! native). [`OffsetStepper`] adalah varian bernilai bertanda untuk
+//! koreksi waktu (−30..=30 menit).
 
+use super::tooltip::{PosisiTooltip, Tooltip};
 use crate::i18n::tr;
 use crate::state;
 use dioxus::prelude::*;
@@ -13,20 +17,22 @@ pub fn Stepper(
     let lang = state::settings().language;
     rsx! {
         div { class: "flex items-center gap-2.5 border border-pass-line rounded-lg px-2.5 py-[5px]",
-            button {
-                class: "font-mono text-[13px] font-semibold text-ink-2 hover:text-ink transition-colors cursor-pointer",
-                title: tr(lang, "dec"),
-                onclick: move |_| on_decrease.call(()),
-                "−"
+            Tooltip { label: tr(lang, "dec").to_string(), posisi: PosisiTooltip::Atas,
+                button {
+                    class: "font-mono text-[13px] font-semibold text-ink-2 hover:text-ink transition-colors cursor-pointer",
+                    onclick: move |_| on_decrease.call(()),
+                    "−"
+                }
             }
             span { class: "font-mono text-xs font-semibold text-ink tabular-nums text-center min-w-[64px]",
                 "{value} {tr(lang, \"unit_minutes\")}"
             }
-            button {
-                class: "font-mono text-[13px] font-semibold text-ink-2 hover:text-ink transition-colors cursor-pointer",
-                title: tr(lang, "inc"),
-                onclick: move |_| on_increase.call(()),
-                "+"
+            Tooltip { label: tr(lang, "inc").to_string(), posisi: PosisiTooltip::Atas,
+                button {
+                    class: "font-mono text-[13px] font-semibold text-ink-2 hover:text-ink transition-colors cursor-pointer",
+                    onclick: move |_| on_increase.call(()),
+                    "+"
+                }
             }
         }
     }
@@ -49,20 +55,22 @@ pub fn OffsetStepper(
     };
     rsx! {
         div { class: "flex items-center gap-2.5 border border-pass-line rounded-lg px-2.5 py-[5px]",
-            button {
-                class: "font-mono text-[13px] font-semibold text-ink-2 hover:text-ink transition-colors cursor-pointer",
-                title: tr(lang, "dec"),
-                onclick: move |_| on_decrease.call(()),
-                "−"
+            Tooltip { label: tr(lang, "dec").to_string(), posisi: PosisiTooltip::Atas,
+                button {
+                    class: "font-mono text-[13px] font-semibold text-ink-2 hover:text-ink transition-colors cursor-pointer",
+                    onclick: move |_| on_decrease.call(()),
+                    "−"
+                }
             }
             span { class: "font-mono text-xs font-semibold text-ink tabular-nums text-center min-w-[64px]",
                 "{berlabel} {tr(lang, \"unit_minutes\")}"
             }
-            button {
-                class: "font-mono text-[13px] font-semibold text-ink-2 hover:text-ink transition-colors cursor-pointer",
-                title: tr(lang, "inc"),
-                onclick: move |_| on_increase.call(()),
-                "+"
+            Tooltip { label: tr(lang, "inc").to_string(), posisi: PosisiTooltip::Atas,
+                button {
+                    class: "font-mono text-[13px] font-semibold text-ink-2 hover:text-ink transition-colors cursor-pointer",
+                    onclick: move |_| on_increase.call(()),
+                    "+"
+                }
             }
         }
     }

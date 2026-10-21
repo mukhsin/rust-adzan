@@ -77,15 +77,17 @@ pub fn Tooltip(label: String, posisi: PosisiTooltip, children: Element) -> Eleme
     };
     rsx! {
         div { class: "relative inline-flex",
-            div { class: "pointer-events-none absolute z-50 flex transition-all duration-150 ease-out {kelas_posisi(posisi)} {animasi}",
+            div { class: "pointer-events-none absolute z-50 flex items-center transition-all duration-150 ease-out {kelas_posisi(posisi)} {animasi}",
                 // Panah di sisi yang menghadap target; bubble & panah menempel.
-                if posisi == PosisiTooltip::Bawah || posisi == PosisiTooltip::Kiri {
+                // Bawah: panah di atas bubble. Selain itu (Atas/Kanan/Kiri):
+                // bubble dulu, panah setelahnya.
+                if posisi == PosisiTooltip::Bawah {
                     {panah(posisi)}
                 }
                 div { class: "bg-ink text-on-ink rounded-md px-2.5 py-1.5 text-[11px] leading-snug whitespace-nowrap",
                     "{label}"
                 }
-                if posisi == PosisiTooltip::Atas || posisi == PosisiTooltip::Kanan {
+                if posisi != PosisiTooltip::Bawah {
                     {panah(posisi)}
                 }
             }

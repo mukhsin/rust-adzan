@@ -3,6 +3,7 @@
 //! samping jam untuk sholat wajib.
 
 use super::ui::icons;
+use super::ui::tooltip::{PosisiTooltip, Tooltip};
 use crate::i18n::tr;
 use crate::prayer::{self, DayTimes, PrayerKind};
 use crate::state;
@@ -161,7 +162,8 @@ pub fn PrayerTable(times: DayTimes, now: NaiveTime, next_kind: PrayerKind) -> El
 /// dirender sama sekali). Klik = flip ikon INSTAN (optimistis), lalu
 /// penulisan settings & persistensi berjalan di belakang. `skip` true saat
 /// adzan baris ini ditarget "lewati adzan berikutnya" (tray): ikon tampil
-/// off dan kliknya MEMBATALKAN skip, bukan mengubah mute.
+/// off dan kliknya MEMBATALKAN skip, bukan mengubah mute. Tooltip memakai
+/// posisi Kiri — bubble berada di atas area baris, muat di window widget.
 #[component]
 fn BellRow(
     kind: PrayerKind,
@@ -184,36 +186,37 @@ fn BellRow(
     };
 
     rsx! {
-        button {
-            class: "p-1 -m-1 rounded-full cursor-pointer {color} hover:opacity-70 transition-opacity",
-            title: "{title}",
-            // Jangan ikut memicu drag kartu / buka pengaturan.
-            onmousedown: move |e| e.stop_propagation(),
-            ondoubleclick: move |e| e.stop_propagation(),
-            onclick: move |_| {
-                if skip {
-                    // Klik lonceng yang off karena skip = batalkan skip.
-                    shown.set(false);
-                    spawn(async move {
-                        crate::state::cancel_skip_next_adzan();
-                        // Item tray hanya bisa disentuh main thread — lewat
-                        // channel perintah dom utama.
-                        crate::state::send_main_command(
-                            crate::state::MainCommand::SkipInactive,
-                        );
-                        crate::logger::info("lewati adzan dibatalkan (papan jadwal)");
-                    });
+        Tooltip { label: title, posisi: PosisiTooltip::Kiri,
+            button {
+                class: "p-1 -m-1 rounded-full cursor-pointer {color} hover:opacity-70 transition-opacity",
+                // Jangan ikut memicu drag kartu / buka pengaturan.
+                onmousedown: move |e| e.stop_propagation(),
+                ondoubleclick: move |e| e.stop_propagation(),
+                onclick: move |_| {
+                    if skip {
+                        // Klik lonceng yang off karena skip = batalkan skip.
+                        shown.set(false);
+                        spawn(async move {
+                            crate::state::cancel_skip_next_adzan();
+                            // Item tray hanya bisa disentuh main thread — lewat
+                            // channel perintah dom utama.
+                            crate::state::send_main_command(
+                                crate::state::MainCommand::SkipInactive,
+                            );
+                            crate::logger::info("lewati adzan dibatalkan (papan jadwal)");
+                        });
+                    } else {
+                        shown.toggle();
+                        spawn(async move {
+                            toggle_adzan_mute(kind);
+                        });
+                    }
+                },
+                if *shown.read() || skip {
+                    icons::IconBellOff { class: "w-3 h-3" }
                 } else {
-                    shown.toggle();
-                    spawn(async move {
-                        toggle_adzan_mute(kind);
-                    });
+                    icons::IconBell { class: "w-3 h-3" }
                 }
-            },
-            if *shown.read() || skip {
-                icons::IconBellOff { class: "w-3 h-3" }
-            } else {
-                icons::IconBell { class: "w-3 h-3" }
             }
         }
     }

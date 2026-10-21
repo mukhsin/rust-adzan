@@ -23,8 +23,8 @@ const PHRASES: &[(&str, &str, &str)] = &[
     ("col_tgl", "Tgl", "Date"),
     ("today", "Hari ini", "Today"),
     ("day_ahad", "Ahad", "Sunday"),
-    ("prev_month", "Bulan sebelumnya", "Previous month"),
-    ("next_month", "Bulan berikutnya", "Next month"),
+    ("prev_month", "Sebelumnya", "Previous"),
+    ("next_month", "Selanjutnya", "Next"),
     (
         "close_hint",
         "Tutup (tetap berjalan di tray)",

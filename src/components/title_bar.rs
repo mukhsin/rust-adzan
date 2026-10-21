@@ -3,6 +3,7 @@
 //! Seluruh bar bisa dipakai drag window; tab & tombol tidak ikut drag.
 
 use crate::components::ui::icons;
+use crate::components::ui::tooltip::{PosisiTooltip, Tooltip};
 use crate::i18n::tr;
 use crate::state;
 use dioxus::prelude::*;
@@ -61,29 +62,32 @@ pub fn TitleBar(tab: Tab, on_select_tab: EventHandler<Tab>) -> Element {
             div { class: "flex-1" }
 
             div { class: "flex items-center gap-0.5",
-                button {
-                    class: "w-[42px] h-[42px] flex items-center justify-center rounded-lg text-ink-2 hover:bg-ink/5 transition-colors cursor-pointer",
-                    title: tr(lang, "win_minimize"),
-                    onmousedown: move |e| e.stop_propagation(),
-                    onclick: move |_| dioxus::desktop::window().set_minimized(true),
-                    icons::IconMinus { class: "w-[15px] h-[15px]" }
+                Tooltip { label: tr(lang, "win_minimize").to_string(), posisi: PosisiTooltip::Bawah,
+                    button {
+                        class: "w-[42px] h-[42px] flex items-center justify-center rounded-lg text-ink-2 hover:bg-ink/5 transition-colors cursor-pointer",
+                        onmousedown: move |e| e.stop_propagation(),
+                        onclick: move |_| dioxus::desktop::window().set_minimized(true),
+                        icons::IconMinus { class: "w-[15px] h-[15px]" }
+                    }
                 }
-                button {
-                    class: "w-[42px] h-[42px] flex items-center justify-center rounded-lg text-ink-2 hover:bg-ink/5 transition-colors cursor-pointer",
-                    title: tr(lang, "win_maximize"),
-                    onmousedown: move |e| e.stop_propagation(),
-                    onclick: move |_| {
-                        let win = dioxus::desktop::window();
-                        win.set_maximized(!win.is_maximized());
-                    },
-                    icons::IconSquare { class: "w-3 h-3" }
+                Tooltip { label: tr(lang, "win_maximize").to_string(), posisi: PosisiTooltip::Bawah,
+                    button {
+                        class: "w-[42px] h-[42px] flex items-center justify-center rounded-lg text-ink-2 hover:bg-ink/5 transition-colors cursor-pointer",
+                        onmousedown: move |e| e.stop_propagation(),
+                        onclick: move |_| {
+                            let win = dioxus::desktop::window();
+                            win.set_maximized(!win.is_maximized());
+                        },
+                        icons::IconSquare { class: "w-3 h-3" }
+                    }
                 }
-                button {
-                    class: "w-[42px] h-[42px] flex items-center justify-center rounded-lg text-ink-2 hover:bg-red-500 hover:text-white transition-colors cursor-pointer",
-                    title: tr(lang, "close_hint"),
-                    onmousedown: move |e| e.stop_propagation(),
-                    onclick: move |_| dioxus::desktop::window().set_visible(false),
-                    icons::IconClose { class: "w-[15px] h-[15px]" }
+                Tooltip { label: tr(lang, "close_hint").to_string(), posisi: PosisiTooltip::Kiri,
+                    button {
+                        class: "w-[42px] h-[42px] flex items-center justify-center rounded-lg text-ink-2 hover:bg-red-500 hover:text-white transition-colors cursor-pointer",
+                        onmousedown: move |e| e.stop_propagation(),
+                        onclick: move |_| dioxus::desktop::window().set_visible(false),
+                        icons::IconClose { class: "w-[15px] h-[15px]" }
+                    }
                 }
             }
         }
