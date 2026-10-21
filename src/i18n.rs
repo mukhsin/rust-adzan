@@ -239,8 +239,8 @@ const PHRASES: &[(&str, &str, &str)] = &[
     ("notif_imsak_title", "Masuk waktu imsak", "It's imsak time"),
     (
         "notif_imsak_body",
-        "Telah masuk waktu imsak — bersiap menuju waktu Subuh. 🌙",
-        "Imsak has started — Fajr is coming up soon. 🌙",
+        "Telah masuk waktu imsak\nBersiap menuju waktu Subuh. 🌙",
+        "Imsak has started\nFajr is coming up soon. 🌙",
     ),
     // Pembaruan (toast + settings)
     ("f_update_check", "Periksa pembaruan", "Update check"),

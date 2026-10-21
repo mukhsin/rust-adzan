@@ -53,6 +53,21 @@ pub fn tick(state: &mut EngineState, settings: &Settings, now: DateTime<Tz>) -> 
     let now_t = now.time();
     let tolerance = Duration::seconds(2);
 
+    // Toast masuk waktu imsak — dijalankan SEBELUM loop sholat: bila imsak
+    // dan pengingat Subuh jatuh di detik yang sama (imsak = Subuh − menit
+    // pengingat, kasus default 10 menit), toast imsak menggantikan pengingat
+    // Subuh agar user tidak menerima dua toast beruntun.
+    if settings.notif_enabled && settings.imsak_notif && !state.imsak_notified {
+        let imsak_secs = times.imsak.num_seconds_from_midnight() as i64;
+        let imsak_elapsed = now_t.num_seconds_from_midnight() as i64 - imsak_secs;
+        if (0..=2).contains(&imsak_elapsed) {
+            state.imsak_notified = true;
+            // Pengingat sebelum Subuh hari ini dianggap terwakili.
+            state.pre_notified.insert(PrayerKind::Subuh);
+            actions.push(Action::NotifyImsak);
+        }
+    }
+
     for kind in ADZAN_PRAYERS {
         let target = times.waktu(kind);
         // Elapsed mentah (bisa negatif sebelum waktu masuk) — sengaja TIDAK
@@ -95,18 +110,6 @@ pub fn tick(state: &mut EngineState, settings: &Settings, now: DateTime<Tz>) -> 
                     });
                 }
             }
-        }
-    }
-
-    // Toast masuk waktu imsak — tanpa audio, dan tidak terpengaruh mute
-    // adzan (imsak penanda waktu sahur, bukan adzan). Imsak selalu sebelum
-    // Subuh pada hari yang sama, jadi tidak ada kasus lintas tengah malam.
-    if settings.notif_enabled && settings.imsak_notif && !state.imsak_notified {
-        let imsak_secs = times.imsak.num_seconds_from_midnight() as i64;
-        let imsak_elapsed = now_t.num_seconds_from_midnight() as i64 - imsak_secs;
-        if (0..=2).contains(&imsak_elapsed) {
-            state.imsak_notified = true;
-            actions.push(Action::NotifyImsak);
         }
     }
 
@@ -447,6 +450,39 @@ mod tests {
         );
         let actions = tick(&mut state, &s, now);
         assert!(!actions.contains(&Action::NotifyImsak), "{actions:?}");
+    }
+
+    #[test]
+    fn imsak_toast_menggantikan_pengingat_subuh_saat_berbarengan() {
+        // Default: imsak = Subuh − 10 menit, pengingat juga 10 menit sebelum
+        // Subuh → keduanya jatuh di detik yang sama. Toast imsak harus
+        // menang; pengingat Subuh tidak boleh ikut terkirim.
+        let s = settings_dengan_jadwal();
+        assert_eq!(s.pre_notif_minutes, 10);
+        let mut state = EngineState::new();
+        let date = (2026, 10, 15);
+        let times = day_times(&s, NaiveDate::from_ymd_opt(2026, 10, 15).unwrap()).unwrap();
+        let now = fake_now(
+            s.timezone(),
+            date,
+            (
+                times.imsak.hour(),
+                times.imsak.minute(),
+                times.imsak.second(),
+            ),
+        );
+        let actions = tick(&mut state, &s, now);
+        assert!(actions.contains(&Action::NotifyImsak), "{actions:?}");
+        assert!(
+            !actions.iter().any(|a| matches!(
+                a,
+                Action::NotifyPre {
+                    kind: PrayerKind::Subuh,
+                    ..
+                }
+            )),
+            "toast imsak harus menggantikan pengingat Subuh: {actions:?}"
+        );
     }
 
     #[test]

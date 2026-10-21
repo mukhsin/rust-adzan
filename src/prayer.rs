@@ -164,12 +164,14 @@ pub fn format_countdown(d: Duration) -> String {
     )
 }
 
-/// Format jam sesuai setting: 24 jam ("04:11") atau 12 jam ("4:11 AM").
+/// Format jam sesuai setting: 24 jam ("04:11") atau 12 jam ("04:11 AM").
+/// Keduanya berawalan nol — lebar teks konstan agar kolom jam (dan lonceng
+/// di sebelahnya) rata di papan jadwal.
 pub fn format_time(t: NaiveTime, h24: bool) -> String {
     if h24 {
         t.format("%H:%M").to_string()
     } else {
-        t.format("%-I:%M %p").to_string()
+        t.format("%I:%M %p").to_string()
     }
 }
 
@@ -216,7 +218,9 @@ mod tests {
     fn format_time_24_dan_12_jam() {
         let sore = NaiveTime::from_hms_opt(16, 5, 0).unwrap();
         assert_eq!(format_time(sore, true), "16:05");
-        assert_eq!(format_time(sore, false), "4:05 PM");
+        // 12 jam tetap berawalan nol agar lebar kolom jam konstan
+        // (lonceng di papan jadwal tetap rata).
+        assert_eq!(format_time(sore, false), "04:05 PM");
         let dini_hari = NaiveTime::from_hms_opt(0, 11, 0).unwrap();
         assert_eq!(format_time(dini_hari, false), "12:11 AM");
     }

@@ -75,12 +75,14 @@ fn file_uri(path: &Path) -> String {
 }
 
 /// Tampilkan toast notification; gagal secara diam-diam (notifikasi bukan fitur kritis).
+/// Body dengan `\n` tampil dua baris (text1 + text2 template toast).
 pub fn show(title: &str, body: &str) {
-    let result = Toast::new(APP_ID)
-        .title(title)
-        .text1(body)
-        .sound(Some(Sound::Default))
-        .show();
+    let toast = Toast::new(APP_ID).title(title);
+    let toast = match body.split_once('\n') {
+        Some((baris1, baris2)) => toast.text1(baris1).text2(baris2),
+        None => toast.text1(body),
+    };
+    let result = toast.sound(Some(Sound::Default)).show();
     if let Err(e) = result {
         crate::logger::error(&format!("notifikasi gagal: {e}"));
     }
