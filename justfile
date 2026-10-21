@@ -34,6 +34,20 @@ css:
 icon:
     cargo run --bin gen-icon
 
+# cek installer terbaru di shared folder kantor (butuh akses \\svrbtch-app-u01)
+check-share:
+    powershell -NoProfile -ExecutionPolicy Bypass -File tools/check-update-share.ps1
+
+# salin installer dari dist/ ke shared folder kantor (butuh VPN kantor).
+# contoh: just publish-share 1.2.0
+publish-share version:
+    @test -f "dist/Jadwal Sholat {{version}} x64-setup.exe" \
+      || (echo "dist/Jadwal Sholat {{version}} x64-setup.exe tidak ada — jalankan 'just release-all {{version}}' atau 'just bundle' dulu."; exit 1)
+    @mkdir -p "//svrbtch-app-u01/SHARE APPLICATION/Jadwal Sholat/v{{version}}"
+    @cp -v "dist/Jadwal Sholat {{version}} x64-setup.exe" \
+      "//svrbtch-app-u01/SHARE APPLICATION/Jadwal Sholat/v{{version}}/"
+    @echo "Tersalin ke share: v{{version}}"
+
 # build installer NSIS ringan (WebView2 diunduh saat instalasi)
 bundle: css
     cargo build --release

@@ -77,17 +77,8 @@ pub fn SettingsView() -> Element {
                     CalculationGroup { draft }
                     MiscGroup { draft,
                         on_autostart_error: move |err: String| dialog.set(Dialog::AutostartError(err)),
+                        on_reset: move |_| dialog.set(Dialog::ResetConfirm),
                     }
-                }
-            }
-
-            // Reset dipindah ke sini dari footer lama; versi kini tampil di
-            // layar Tentang.
-            div { class: "flex items-center justify-center pt-1 pb-2",
-                button {
-                    class: "px-3 py-2 rounded-lg text-[13px] font-semibold text-red-500 border border-pass-line hover:border-red-400 transition-colors cursor-pointer",
-                    onclick: move |_| dialog.set(Dialog::ResetConfirm),
-                    "{tr(lang, \"reset_btn\")}"
                 }
             }
 
@@ -549,8 +540,24 @@ fn AppearanceGroup(draft: Signal<Settings>) -> Element {
 
 /// Grup LAINNYA: bahasa UI + auto-start saat Windows menyala.
 #[component]
-fn MiscGroup(draft: Signal<Settings>, on_autostart_error: EventHandler<String>) -> Element {
+fn MiscGroup(
+    draft: Signal<Settings>,
+    on_autostart_error: EventHandler<String>,
+    on_reset: EventHandler<()>,
+) -> Element {
     let lang = state::settings().language;
+    // Status cek pembaruan manual — tombol menampilkan spinner selama
+    // HTTP/UNC scan berjalan di thread latar (dipoll dari update.rs).
+    let mut cek_berjalan = use_signal(|| false);
+    use_future(move || async move {
+        loop {
+            tokio::time::sleep(std::time::Duration::from_millis(150)).await;
+            let berjalan = crate::update::cek_manual_berjalan();
+            if *cek_berjalan.read() != berjalan {
+                cek_berjalan.set(berjalan);
+            }
+        }
+    });
 
     rsx! {
         Group { label: tr(lang, "sec_misc"),
@@ -614,6 +621,63 @@ fn MiscGroup(draft: Signal<Settings>, on_autostart_error: EventHandler<String>) 
                     },
                 }
             }
+            Row { label: tr(lang, "f_update_check"),
+                div { class: "flex items-center gap-2",
+                    // Tombol cek hanya relevan di mode Manual — saat Otomatis
+                    // pemeriksaan berjalan sendiri tiap 1 jam.
+                    if !draft.read().update_check {
+                        button {
+                            class: if *cek_berjalan.read() {
+                                "{BTN} min-w-[118px] justify-center opacity-50 cursor-wait"
+                            } else {
+                                "{BTN} min-w-[118px] justify-center"
+                            },
+                            disabled: *cek_berjalan.read(),
+                            onclick: move |_| {
+                                // Re-entry di-guard di dalam check_now_manual.
+                                crate::update::check_now_manual();
+                            },
+                            if *cek_berjalan.read() {
+                                span { class: "w-[13px] h-[13px] rounded-full border-2 border-ink-3 border-t-transparent animate-spin inline-block" }
+                                span { class: "text-ink-2", "{tr(lang, \"update_checking\")}" }
+                            } else {
+                                "{tr(lang, \"update_check_btn\")}"
+                            }
+                        }
+                    }
+                    Segmented {
+                        options: vec![
+                            (
+                                "manual".to_string(),
+                                tr(lang, "update_mode_manual").to_string(),
+                            ),
+                            (
+                                "otomatis".to_string(),
+                                tr(lang, "update_mode_otomatis").to_string(),
+                            ),
+                        ],
+                        active: if draft.read().update_check {
+                            "otomatis".to_string()
+                        } else {
+                            "manual".to_string()
+                        },
+                        on_select: move |v: String| {
+                            let otomatis = v == "otomatis";
+                            if draft.read().update_check == otomatis {
+                                return;
+                            }
+                            let mut s = draft.read().clone();
+                            s.update_check = otomatis;
+                            apply_settings(draft, s);
+                            if otomatis {
+                                // Baru dinyalakan: cek langsung sekali, tidak
+                                // menunggu siklus 1 jam.
+                                crate::update::picu_cek_otomatis();
+                            }
+                        },
+                    }
+                }
+            }
             Row { label: tr(lang, "f_autostart"),
                 Switch {
                     checked: draft.read().autostart,
@@ -627,23 +691,11 @@ fn MiscGroup(draft: Signal<Settings>, on_autostart_error: EventHandler<String>) 
                     },
                 }
             }
-            Row { label: tr(lang, "f_update_check"), hint: tr(lang, "hint_update_check"),
-                Switch {
-                    checked: draft.read().update_check,
-                    on_change: move |on| {
-                        let mut s = draft.read().clone();
-                        s.update_check = on;
-                        apply_settings(draft, s);
-                    },
-                }
-            }
-            Row { label: tr(lang, "update_check_row"),
-                Tooltip { label: tr(lang, "hint_update_check").to_string(), posisi: PosisiTooltip::Kiri,
-                    button {
-                        class: "{BTN}",
-                        onclick: move |_| crate::update::check_now_manual(),
-                        "{tr(lang, \"update_check_btn\")}"
-                    }
+            Row { label: tr(lang, "reset_btn"),
+                button {
+                    class: "px-3 py-1.5 rounded-lg text-[12.5px] font-semibold text-red-500 border border-red-400/60 hover:border-red-400 hover:bg-red-500/10 transition-colors cursor-pointer",
+                    onclick: move |_| on_reset.call(()),
+                    "{tr(lang, \"reset_action\")}"
                 }
             }
         }

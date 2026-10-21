@@ -88,15 +88,24 @@ pub fn show(title: &str, body: &str) {
     }
 }
 
+/// Target dibuka saat toast diklik.
+#[derive(Debug, Clone)]
+pub enum TargetBuka {
+    /// URL halaman rilis GitHub → browser bawaan.
+    Browser(String),
+    /// Path folder (share kantor) → jendela Explorer.
+    Folder(String),
+}
+
 /// Toast yang badannya bisa diklik — dipakai toast pembaruan: klik membuka
-/// `url` (halaman rilis) di browser bawaan.
-pub fn show_clickable(title: &str, body: &str, url: String) {
+/// target sesuai sumber pembaruan (GitHub atau share kantor).
+pub fn show_clickable(title: &str, body: &str, target: TargetBuka) {
     let result = Toast::new(APP_ID)
         .title(title)
         .text1(body)
         .sound(Some(Sound::Default))
         .on_activated(move |_| {
-            open_url(&url);
+            buka(&target);
             Ok(())
         })
         .show();
@@ -116,6 +125,25 @@ fn open_url(url: &str) {
         .spawn();
     if let Err(e) = result {
         crate::logger::error(&format!("gagal membuka {url}: {e}"));
+    }
+}
+
+/// Buka target toast sesuai jenisnya. `explorer.exe` sengaja tanpa `start` —
+/// ia tetap asinkron dan exit code-nya (kerap 1 walau sukses) tidak dipakai.
+fn buka(target: &TargetBuka) {
+    use std::os::windows::process::CommandExt;
+    const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+    match target {
+        TargetBuka::Browser(url) => open_url(url),
+        TargetBuka::Folder(path) => {
+            let result = std::process::Command::new("explorer.exe")
+                .arg(path)
+                .creation_flags(CREATE_NO_WINDOW)
+                .spawn();
+            if let Err(e) = result {
+                crate::logger::error(&format!("gagal membuka folder {path}: {e}"));
+            }
+        }
     }
 }
 

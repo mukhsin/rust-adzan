@@ -195,6 +195,7 @@ const PHRASES: &[(&str, &str, &str)] = &[
         "Run at Windows startup",
     ),
     ("reset_btn", "Reset semua pengaturan", "Reset all settings"),
+    ("reset_action", "Reset", "Reset"),
     ("version_label", "Versi {versi}", "Version {versi}"),
     (
         "modal_reset_msg",
@@ -244,17 +245,10 @@ const PHRASES: &[(&str, &str, &str)] = &[
     ),
     // Pembaruan (toast + settings)
     ("f_update_check", "Periksa pembaruan", "Update check"),
-    (
-        "hint_update_check",
-        "cek rilis baru di GitHub secara otomatis",
-        "automatically check GitHub for new releases",
-    ),
-    (
-        "update_check_row",
-        "Cek pembaruan manual",
-        "Manual update check",
-    ),
     ("update_check_btn", "Cek sekarang", "Check now"),
+    ("update_mode_manual", "Manual", "Manual"),
+    ("update_mode_otomatis", "Otomatis", "Automatic"),
+    ("update_checking", "Mengecek…", "Checking…"),
     ("update_title", "Pembaruan tersedia", "Update available"),
     (
         "update_body",
@@ -278,8 +272,8 @@ const PHRASES: &[(&str, &str, &str)] = &[
     ),
     (
         "update_failed_body",
-        "Tidak bisa menghubungi GitHub — periksa koneksi internet.",
-        "Could not reach GitHub — check your internet connection.",
+        "Tidak bisa mengecek pembaruan — periksa koneksi.",
+        "Could not check for updates — check your connection.",
     ),
     // Layar Harian — tanggal penting & kiblat
     ("sec_dates", "Tanggal Penting", "Important Dates"),
@@ -473,8 +467,8 @@ mod tests {
         assert_eq!(tr(Language::En, "app_name"), "Prayer Times");
         assert_eq!(tr(Language::Id, "subuh"), "Subuh");
         assert_eq!(tr(Language::En, "subuh"), "Fajr");
-        assert!(tr(Language::En, "update_title").len() > 0);
-        assert!(tr(Language::Id, "notif_imsak_title").len() > 0);
+        assert!(!tr(Language::En, "update_title").is_empty());
+        assert!(!tr(Language::Id, "notif_imsak_title").is_empty());
     }
 
     #[test]

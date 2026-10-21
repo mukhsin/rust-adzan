@@ -34,7 +34,7 @@ pub fn DropSearch(
 ) -> Element {
     let lang = state::settings().language;
     let mut open = use_signal(|| false);
-    let mut kueri = use_signal(|| String::new());
+    let mut kueri = use_signal(String::new);
 
     let cari = kueri().to_lowercase();
     let daftar: Vec<(String, String)> = if !searchable || cari.is_empty() {

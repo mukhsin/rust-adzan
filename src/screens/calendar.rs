@@ -244,7 +244,7 @@ pub fn CalendarView() -> Element {
                                         div { class: "flex-1 flex flex-col items-center justify-center gap-[3px] min-w-0",
                                             span { class: "{masehi_class}", "{date.day()}" }
                                             if let Some(nama) = &acara {
-                                                Tooltip { label: nama.clone(), posisi: PosisiTooltip::Atas,
+                                                Tooltip { label: (*nama).to_string(), posisi: PosisiTooltip::Atas,
                                                     span { class: "{acara_class}", "{nama}" }
                                                 }
                                             }

@@ -23,6 +23,8 @@ pub enum PosisiTooltip {
     /// Di bawah target, panah menunjuk ke atas.
     Bawah,
     /// Di kanan target, panah menunjuk ke kiri.
+    /// (Belum ada pemakai — opsi API komponen untuk kebutuhan mendatang.)
+    #[allow(dead_code)]
     Kanan,
     /// Di kiri target, panah menunjuk ke kanan.
     Kiri,

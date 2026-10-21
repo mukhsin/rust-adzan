@@ -61,8 +61,7 @@ pub fn resolve_subuh(settings: &crate::settings::Settings) -> Option<PathBuf> {
     }
     ["adzan-subuh.mp3", "adzan_subuh.mp3"]
         .iter()
-        .map(|name| candidates(name))
-        .flatten()
+        .flat_map(|name| candidates(name))
         .find(|p| p.exists())
 }
 

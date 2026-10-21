@@ -213,8 +213,10 @@ mod tests {
 
     #[test]
     fn settings_serde_roundtrip() {
-        let mut s = Settings::default();
-        s.city = Some("Makassar".into());
+        let mut s = Settings {
+            city: Some("Makassar".into()),
+            ..Default::default()
+        };
         s.lat = -5.1477;
         s.lng = 119.4327;
         s.timezone = "Asia/Makassar".into();
