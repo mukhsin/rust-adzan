@@ -42,6 +42,7 @@ const PHRASES: &[(&str, &str, &str)] = &[
     ("unit_minutes", "menit", "min"),
     ("win_minimize", "Minimalkan", "Minimize"),
     ("win_maximize", "Maksimalkan", "Maximize"),
+    ("win_restore", "Pulihkan", "Restore"),
     // Kartu tiket widget
     ("masuk_pukul", "— masuk pukul {waktu}", "— at {waktu}"),
     // Nama baris jadwal (termasuk sholat wajib, lihat PrayerKind::key)

@@ -49,8 +49,10 @@ pub fn app() -> Element {
         }
     });
 
-    // Saat startup hanya widget yang tampil — window pengaturan tetap
-    // tersembunyi sampai dibuka lewat tray / tombol pengaturan di widget.
+    // Saat startup widget langsung tampil. Window utama ditampilkan sendiri
+    // oleh dioxus setelah webview selesai load (visible builder = true) —
+    // tanpa kedipan putih. Setelah itu close-to-tray tetap bekerja karena
+    // penyetelan visibilitas initialize hanya sekali per window.
     use_future(move || async move {
         // Jeda sekejap agar inisialisasi menu tray (TraySetup) selesai dulu,
         // supaya centang "Widget Desktop" ikut tersinkron.
