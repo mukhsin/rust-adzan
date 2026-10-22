@@ -59,6 +59,24 @@ bundle: css
       /DOUTDIR="$(cygpath -w "$(pwd)/target/nsis")" \
       tools/installer.nsi
 
+# build installer lalu salin ke dist/ — versi diambil dari installer.nsi.
+# contoh: just dist
+dist: bundle
+    @test "$(sed -n 's/^!define VERSION "\(.*\)"/\1/p' tools/installer.nsi)" = "$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml)" \
+      || (echo "Versi tidak sinkron (Cargo.toml vs installer.nsi) — jalankan 'just set-version <x.y.z>' dulu."; exit 1)
+    @mkdir -p dist
+    @V=$(sed -n 's/^!define VERSION "\(.*\)"/\1/p' tools/installer.nsi); \
+      cp -v "target/nsis/Jadwal Sholat ${V} x64-setup.exe" dist/; \
+      echo "Siap: dist/Jadwal Sholat ${V} x64-setup.exe"
+
+# set versi di Cargo.toml & installer.nsi sekaligus.
+# contoh: just set-version 1.3.1
+set-version version:
+    @echo '{{version}}' | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$' || (echo "Versi harus format x.y.z (contoh: 1.3.1)"; exit 1)
+    @sed -i 's/^version = ".*"/version = "{{version}}"/' Cargo.toml
+    @sed -i 's/!define VERSION ".*"/!define VERSION "{{version}}"/' tools/installer.nsi
+    @echo "Versi di-set ke {{version}} (Cargo.toml + installer.nsi)"
+
 # jalankan semua unit test (prayer, scheduler, dll)
 test: css
     cargo test
@@ -113,7 +131,5 @@ release-all version notes="":
     @git add Cargo.toml Cargo.lock tools/installer.nsi
     @git diff --cached --quiet || git commit -m "release: v{{version}}"
     @git push
-    @just bundle
-    @mkdir -p dist
-    @cp -v "target/nsis/Jadwal Sholat {{version}} x64-setup.exe" dist/
+    @just dist
     @bash tools/release.sh {{version}} {{notes}}
