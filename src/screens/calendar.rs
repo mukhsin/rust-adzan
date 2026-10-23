@@ -137,21 +137,19 @@ pub fn CalendarView() -> Element {
                     }
                 }
                 // Unduh kalender bulan aktif sebagai gambar siap cetak.
-                Tooltip { label: tr(lang, "unduh_btn").to_string(), posisi: PosisiTooltip::Bawah,
-                    button {
-                        class: "flex items-center gap-1.5 bg-pass border border-pass-line rounded-lg px-3 py-1.5 text-[12.5px] font-semibold text-ink-2 hover:text-ink hover:border-ink-3 transition-colors cursor-pointer",
-                        onclick: move |_| {
-                            let s = state::settings();
-                            crate::export::unduh_gambar(
-                                &s,
-                                crate::export::JenisUnduhan::Kalender,
-                                year,
-                                month,
-                            );
-                        },
-                        icons::IconDownload { class: "w-4 h-4" }
-                        "{tr(lang, \"unduh_btn\")}"
-                    }
+                button {
+                    class: "flex items-center gap-1.5 bg-pass border border-pass-line rounded-lg px-3 py-1.5 text-[12.5px] font-semibold text-ink-2 hover:text-ink hover:border-ink-3 transition-colors cursor-pointer",
+                    onclick: move |_| {
+                        let s = state::settings();
+                        crate::export::unduh_gambar(
+                            &s,
+                            crate::export::JenisUnduhan::Kalender,
+                            year,
+                            month,
+                        );
+                    },
+                    icons::IconDownload { class: "w-4 h-4" }
+                    "{tr(lang, \"unduh_btn\")}"
                 }
             }
 
