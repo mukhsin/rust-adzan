@@ -13,6 +13,7 @@ pub enum Tab {
     Harian,
     Bulanan,
     Kalender,
+    Quran,
     Pengaturan,
     Tentang,
 }
@@ -24,6 +25,7 @@ pub fn TitleBar(tab: Tab, on_select_tab: EventHandler<Tab>) -> Element {
         (Tab::Harian, tr(lang, "tab_daily")),
         (Tab::Bulanan, tr(lang, "tab_monthly")),
         (Tab::Kalender, tr(lang, "tab_kalender")),
+        (Tab::Quran, tr(lang, "tab_quran")),
         (Tab::Pengaturan, tr(lang, "settings_title")),
         (Tab::Tentang, tr(lang, "tab_tentang")),
     ];

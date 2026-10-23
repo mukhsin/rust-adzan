@@ -14,6 +14,8 @@
   --font-mono: "Martian Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
   /* Font khusus hitung mundur besar di widget. */
   --font-count: "Roboto Condensed", "Segoe UI", ui-sans-serif, sans-serif;
+  /* Font teks Arab mushaf (screen Al-Qur'an) — Amiri ter-embed. */
+  --font-arab: "Amiri", "Noto Naskh Arabic", "Traditional Arabic", "Segoe UI", serif;
 }
 
 /* Token warna desain (dari design system "Jadwal Sholat Impeccable.pen").

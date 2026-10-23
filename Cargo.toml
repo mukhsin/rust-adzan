@@ -11,6 +11,7 @@ dioxus-icons = "0.1.0"
 dirs = "7.0.0"
 icu_calendar = "2.3.0"
 image = { version = "0.25.10", default-features = false, features = ["png"] }
+resvg = "0.48.1"
 rfd = "0.15.4"
 rodio = "0.23.0"
 salah = "0.7.6"

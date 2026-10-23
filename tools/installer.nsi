@@ -46,11 +46,12 @@ FunctionEnd
 Section "Install"
   ; App sedang berjalan? Tutup dulu (upgrade di tempat). WM_CLOSE hanya
   ; menyembunyikan window (app tetap di tray), jadi pakai taskkill /F.
+  ; /SD IDOK: pada mode silent (/S, alur auto-update) pilih OK otomatis.
   FindWindow $0 "" "${APPNAME}"
   ${If} $0 != 0
     MessageBox MB_OKCANCEL|MB_ICONEXCLAMATION \
       "${APPNAME} sedang berjalan dan akan ditutup sementara agar pembaruan berhasil. Buka kembali aplikasi setelah instalasi selesai.$\n$\nLanjutkan?" \
-      IDOK +2
+      /SD IDOK IDOK +2
     Abort
     nsExec::Exec 'taskkill /F /IM "${EXENAME}"'
     Pop $0
@@ -93,6 +94,12 @@ Section "Install"
   WriteRegStr HKCU "${ARP_KEY}" "UninstallString" "$INSTDIR\uninstall.exe"
   WriteRegDWORD HKCU "${ARP_KEY}" "EstimatedSize" 12
   WriteRegStr HKCU "Software\${UNINSTKEY}" "InstallDir" "$INSTDIR"
+
+  ; Mode silent (alur auto-update dari dalam aplikasi): halaman finish
+  ; tidak tampil, jadi restart aplikasi langsung dari sini.
+  ${If} ${Silent}
+    Exec '"$INSTDIR\${EXENAME}"'
+  ${EndIf}
 SectionEnd
 
 Section "Uninstall"

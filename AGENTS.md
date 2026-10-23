@@ -27,3 +27,16 @@
   `css` adalah dependency resep-resep compile di justfile; skrip skip regen
   bila hasil masih segar. Ganti class di rsx → regen otomatis saat `just`
   berikutnya; regen butuh bunx (bun).
+- Data Al-Qur'an ter-embed (`assets/quran.json`): regen via
+  `bun tools/quran-build.mjs` (mushaf + terjemahan Kemenag; output
+  di-commit). Layer: `src/quran.rs` (zero-copy, OnceLock). Jangan edit
+  JSON manual.
+- Font Arab Amiri (`assets/fonts/amiri-regular.woff2`, subset Arab, OFL):
+  daftarkan di `tools/embed-fonts.sh` lalu regen `fonts.css`; dipakai
+  kelas `font-arab`.
+- Ekspor gambar (`src/export.rs`): SVG dirakit manual → resvg (font
+  sistem). Koordinat elemen `<line>` WAJIB named args `format!` —
+  argumen posisi pernah ketuker dan menghasilkan garis diagonal.
+- Testing: `JADWAL_FAKE_DATE=YYYY-MM-DD` memalsukan tanggal (bisa
+  digabung `JADWAL_FAKE_TIME`) — uji mode Ramadan & label Sholat Jumat
+  (Dzuhur Jumat = "Sholat Jumat" via `prayer::nama_hari_ini`).

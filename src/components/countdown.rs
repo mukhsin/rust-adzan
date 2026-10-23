@@ -13,6 +13,7 @@ use dioxus::prelude::*;
 pub fn CountdownPane(
     times: DayTimes,
     now: NaiveTime,
+    jumat: bool,
     tz: String,
     hari: String,
     tanggal: String,
@@ -34,9 +35,16 @@ pub fn CountdownPane(
         tz
     );
     // Saat puasa dan menunggu Maghrib, berbuka lebih bermakna daripada
-    // nama sholatnya; selebihnya label standar.
+    // nama sholatnya; Jumat: Dzuhur berlabel "Sholat Jumat"; selebihnya
+    // label standar.
     let menuju = if ramadan_day.is_some() && next_kind == PrayerKind::Maghrib {
         tr(lang, "countdown_berbuka").to_string()
+    } else if jumat && next_kind == PrayerKind::Dzuhur {
+        format!(
+            "{} {}",
+            tr(lang, "countdown_prefix"),
+            tr(lang, "sholat_jumat")
+        )
     } else {
         format!("{} {}", tr(lang, "countdown_prefix"), next_kind.nama(lang))
     };

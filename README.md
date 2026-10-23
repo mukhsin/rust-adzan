@@ -19,9 +19,15 @@ lokal, tidak butuh internet).
   lewat tombol Stop.
 - **Countdown** — hitung mundur real-time ke sholat berikutnya
   (setelah Isya mengarah ke Subuh esok hari).
-- **System tray** — klik kiri ikon tray men-toggle widget; klik kanan membuka
-  menu (tampilkan main window, widget, keluar). Aplikasi tetap berjalan
-  di tray.
+- **Waktu Lainnya** — Dhuha, tengah malam syar'i, dan sepertiga malam
+  akhir tampil di layar Harian.
+- **Al-Qur'an** — 114 surah lengkap (mushaf & terjemahan Kementerian
+  Agama, ter-embed, 100% offline) dengan pencarian surah dan font Amiri.
+- **Ekspor gambar** — jadwal bulanan & kalender Masehi–Hijriah–Jawa
+  diunduh sebagai PNG/JPG siap cetak.
+- **System tray** — klik kiri ikon tray men-toggle main window; klik kanan
+  membuka menu (tampilkan main window, widget desktop, lewati adzan
+  berikutnya, keluar). Aplikasi tetap berjalan di tray.
 - **Alur window** — buka aplikasi → main window. Tutup main window →
   widget muncul sebagai gantinya. Tutup widget → semua tersimpan di tray.
 - **Notifikasi** — toast Windows saat pengingat X menit sebelum adzan

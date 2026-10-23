@@ -70,7 +70,8 @@ pub fn TraySetup() -> Element {
     // Menu tray ikut ganti bahasa tanpa restart (render = main thread).
     sync_tray_language(state::settings().language);
 
-    // Klik kiri ikon tray: toggle widget desktop.
+    // Klik kiri ikon tray: toggle window utama (tampil/sembunyi). Widget
+    // tetap lewat menu (item "Widget Desktop").
     // Event `Click` di-emit dua kali (press & release) — reaksi hanya saat
     // release supaya toggle tidak langsung dibatalkan oleh event kedua.
     use_tray_icon_event_handler(|event| {
@@ -80,7 +81,7 @@ pub fn TraySetup() -> Element {
             ..
         } = event
         {
-            window::toggle_widget();
+            window::toggle_main();
         }
     });
 

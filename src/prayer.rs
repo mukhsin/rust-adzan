@@ -42,6 +42,21 @@ impl PrayerKind {
     }
 }
 
+/// Nama sholat sesuai konteks tanggal — Dzuhur pada Jumat tampil sebagai
+/// "Sholat Jumat" (konvensi imsakiyah; crate `salah` melakukan hal serupa).
+pub fn nama_hari_ini(
+    kind: PrayerKind,
+    lang: crate::settings::Language,
+    tanggal: NaiveDate,
+) -> &'static str {
+    use chrono::Datelike as _;
+    if kind == PrayerKind::Dzuhur && tanggal.weekday() == chrono::Weekday::Fri {
+        crate::i18n::tr(lang, "sholat_jumat")
+    } else {
+        kind.nama(lang)
+    }
+}
+
 /// Jadwal satu hari (waktu lokal kota, `NaiveTime`).
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct DayTimes {
@@ -49,10 +64,16 @@ pub struct DayTimes {
     pub imsak: NaiveTime,
     pub subuh: NaiveTime,
     pub terbit: NaiveTime,
+    /// Dhuha: 20 menit setelah Terbit (konvensi imsakiyah).
+    pub dhuha: NaiveTime,
     pub dzuhur: NaiveTime,
     pub ashar: NaiveTime,
     pub maghrib: NaiveTime,
     pub isya: NaiveTime,
+    /// Tengah malam syar'i: titik tengah interval Maghrib → Subuh esok.
+    pub tengah_malam: NaiveTime,
+    /// Sepertiga malam akhir: ⅔ interval Maghrib → Subuh esok (waktu qiyam).
+    pub sepertiga_malam: NaiveTime,
     /// Subuh esok hari — dipakai untuk countdown setelah Isya.
     pub subuh_esok: NaiveTime,
 }
@@ -115,17 +136,38 @@ pub fn day_times(settings: &Settings, date: NaiveDate) -> Option<DayTimes> {
         t + Duration::minutes(settings.offset_of(kind) as i64)
     };
     let subuh = geser(PrayerKind::Subuh, local(Prayer::Fajr, &schedule));
+    let terbit =
+        local(Prayer::Sunrise, &schedule) + Duration::minutes(settings.offset_terbit() as i64);
+    let maghrib = geser(PrayerKind::Maghrib, local(Prayer::Maghrib, &schedule));
+    let subuh_esok = geser(PrayerKind::Subuh, local(Prayer::Fajr, &schedule_tomorrow));
 
     Some(DayTimes {
         imsak: subuh - Duration::minutes(10),
         subuh,
-        terbit: local(Prayer::Sunrise, &schedule),
+        terbit,
+        // Dhuha mengikuti Terbit (memang tanpa offset). Tengah malam &
+        // sepertiga malam dihitung dari Maghrib & Subuh esok terkoreksi
+        // agar konsisten dengan jadwal yang tampil di layar.
+        dhuha: terbit + Duration::minutes(20),
         dzuhur: geser(PrayerKind::Dzuhur, local(Prayer::Dhuhr, &schedule)),
         ashar: geser(PrayerKind::Ashar, local(Prayer::Asr, &schedule)),
-        maghrib: geser(PrayerKind::Maghrib, local(Prayer::Maghrib, &schedule)),
+        maghrib,
         isya: geser(PrayerKind::Isya, local(Prayer::Isha, &schedule)),
-        subuh_esok: geser(PrayerKind::Subuh, local(Prayer::Fajr, &schedule_tomorrow)),
+        tengah_malam: bagi_malam(maghrib, subuh_esok, 0.5),
+        sepertiga_malam: bagi_malam(maghrib, subuh_esok, 2.0 / 3.0),
+        subuh_esok,
     })
+}
+
+/// Bagi malam Maghrib → Subuh esok pada proporsi `porsi` (0.5 = tengah
+/// malam syar'i, 2.0/3.0 = sepertiga malam akhir / waktu qiyam). Rumus sama
+/// dengan internal crate `salah` (`calculate_qiyam`; field-nya tidak
+/// diekspos publik). Hasil dibulatkan ke menit terdekat.
+fn bagi_malam(maghrib: NaiveTime, subuh_esok: NaiveTime, porsi: f64) -> NaiveTime {
+    let malam = time_until(maghrib, subuh_esok).num_seconds() as f64;
+    let total = maghrib.num_seconds_from_midnight() as f64 + malam * porsi;
+    let bulat = (((total / 60.0).round() as i64) * 60).rem_euclid(86_400) as u32;
+    NaiveTime::from_num_seconds_from_midnight_opt(bulat, 0).expect("detik dalam sehari")
 }
 
 /// Sholat berikutnya dari `now`; kembalikan `(nama, waktu target)`.
@@ -138,6 +180,41 @@ pub fn next_prayer(times: &DayTimes, now: NaiveTime) -> (PrayerKind, NaiveTime) 
         }
     }
     (PrayerKind::Subuh, times.subuh_esok)
+}
+
+/// Target countdown harian: sholat biasa, atau imsak saat Ramadan.
+///
+/// Sengaja belum terhubung UI: label countdown spesial Ramadan ("Menuju
+/// Imsak") dikeluarkan dari desain v1.4 — fungsi disiapkan untuk
+/// menghidupkannya kembali di rilis berikutnya.
+#[allow(dead_code)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TargetHarian {
+    /// Sholat berikutnya (perilaku non-Ramadan; Maghrib saat Ramadan
+    /// tetap varian ini — label "Menuju Berbuka" diganti oleh UI).
+    Sholat(PrayerKind, NaiveTime),
+    /// Menuju imsak (pra-Subuh saat Ramadan, atau setelah Isya → imsak esok).
+    Imsak(NaiveTime),
+}
+
+/// Target countdown dengan penyesuaian Ramadan:
+/// - pra-imsak (`now < imsak`) → imsak hari ini (lintas tengah malam pun
+///   benar karena `DayTimes` sudah rolover ke hari baru);
+/// - antara imsak dan Isya → perilaku normal (`next_prayer`);
+/// - setelah Isya → imsak esok (Subuh esok − 10 menit, konvensi Kemenag).
+#[allow(dead_code)]
+pub fn target_countdown(ramadan: bool, times: &DayTimes, now: NaiveTime) -> TargetHarian {
+    let (kind, target) = next_prayer(times, now);
+    if !ramadan {
+        return TargetHarian::Sholat(kind, target);
+    }
+    match kind {
+        PrayerKind::Subuh if now < times.imsak => TargetHarian::Imsak(times.imsak),
+        PrayerKind::Subuh if now >= times.isya => {
+            TargetHarian::Imsak(times.subuh_esok - Duration::minutes(10))
+        }
+        _ => TargetHarian::Sholat(kind, target),
+    }
 }
 
 /// Selisih `target - now` sebagai Duration untuk COUNTDOWN.
@@ -177,27 +254,67 @@ pub fn format_time(t: NaiveTime, h24: bool) -> String {
 
 /// Waktu "sekarang" dalam zona waktu kota.
 ///
-/// Untuk testing: set env `JADWAL_FAKE_TIME=HH:MM[:SS]` saat menjalankan app
-/// agar jam internal digeser ke waktu tersebut (tetap berjalan/berdetak).
-/// Offset dihitung sekali saat pemanggilan pertama. Tanpa env var = jam asli.
+/// Untuk testing, dua env var (bisa dipakai sendiri-sendiri atau digabung):
+/// - `JADWAL_FAKE_TIME=HH:MM[:SS]` — jam internal digeser ke waktu tersebut
+///   (tetap berjalan/berdetak), tanggal tetap hari asli;
+/// - `JADWAL_FAKE_DATE=YYYY-MM-DD` — tanggal dipalsukan (mis. untuk uji
+///   mode Ramadan: `2027-02-12`), jam mengikuti jam asli (atau
+///   `JADWAL_FAKE_TIME` bila juga disetel).
+///
+/// Offset dihitung sekali saat pemanggilan pertama. Tanpa env var = jam
+/// asli. Karena cuma offset Duration, seluruh tampilan (countdown, badge
+/// Ramadan, kalender, penanda hari ini) ikut bergeser konsisten.
 pub fn now_in_tz(settings: &Settings) -> DateTime<chrono_tz::Tz> {
     let real = chrono::Utc::now().with_timezone(&settings.timezone());
     let offset = *FAKE_OFFSET.get_or_init(|| {
-        std::env::var("JADWAL_FAKE_TIME")
+        let fake_jam = std::env::var("JADWAL_FAKE_TIME").ok().and_then(|raw| {
+            NaiveTime::parse_from_str(&raw, "%H:%M:%S")
+                .or_else(|_| NaiveTime::parse_from_str(&raw, "%H:%M"))
+                .ok()
+        });
+        let fake_tanggal = std::env::var("JADWAL_FAKE_DATE")
             .ok()
-            .and_then(|raw| {
-                let fake = NaiveTime::parse_from_str(&raw, "%H:%M:%S")
-                    .or_else(|_| NaiveTime::parse_from_str(&raw, "%H:%M"))
-                    .ok()?;
-                let fake_dt = real
-                    .timezone()
-                    .from_local_datetime(&real.date_naive().and_time(fake))
-                    .single()?;
-                Some(fake_dt - real)
-            })
-            .inspect(|o| {
+            .and_then(|raw| NaiveDate::parse_from_str(&raw, "%Y-%m-%d").ok());
+
+        let geser = |tgl: NaiveDate, jam: NaiveTime| -> Option<Duration> {
+            let dt = real
+                .timezone()
+                .from_local_datetime(&tgl.and_time(jam))
+                .single()?;
+            Some(dt - real)
+        };
+
+        let offset = match (fake_tanggal, fake_jam) {
+            // Tanggal palsu + (jam asli atau jam palsu).
+            (Some(tgl), jam) => geser(tgl, jam.unwrap_or(real.time())),
+            // Hanya jam palsu — perilaku lama.
+            (None, Some(jam)) => geser(real.date_naive(), jam),
+            (None, None) => None,
+        };
+        match (fake_tanggal, fake_jam, offset) {
+            (Some(t), Some(j), Some(o)) => {
+                crate::logger::info(&format!(
+                    "JADWAL_FAKE_DATE={t} + JADWAL_FAKE_TIME aktif — jam palsu {j}, offset {o}"
+                ));
+                Some(o)
+            }
+            (Some(t), None, Some(o)) => {
+                crate::logger::info(&format!(
+                    "JADWAL_FAKE_DATE={t} aktif — tanggal dipalsukan, offset {o}"
+                ));
+                Some(o)
+            }
+            (None, Some(_), Some(o)) => {
                 crate::logger::info(&format!("JADWAL_FAKE_TIME aktif — jam digeser {o}"));
-            })
+                Some(o)
+            }
+            _ => {
+                if fake_tanggal.is_some() || fake_jam.is_some() {
+                    crate::logger::error("env JADWAL_FAKE_* tak terbaca — jam asli dipakai");
+                }
+                None
+            }
+        }
     });
     match offset {
         Some(o) => real + o,
@@ -330,6 +447,45 @@ mod tests {
     }
 
     #[test]
+    fn offset_terbit_menggeser_terbit_dan_dhuha() {
+        let date = NaiveDate::from_ymd_opt(2026, 10, 15).unwrap();
+        let mut s = jakarta();
+        s.terbit_offset = 5;
+        let murni = day_times(&jakarta(), date).unwrap();
+        let geser = day_times(&s, date).unwrap();
+
+        let menit = |a: NaiveTime, b: NaiveTime| -> i64 {
+            (a.num_seconds_from_midnight() as i64 - b.num_seconds_from_midnight() as i64) / 60
+        };
+        assert_eq!(menit(geser.terbit, murni.terbit), 5);
+        // Dhuha mengikuti Terbit.
+        assert_eq!(menit(geser.dhuha, murni.dhuha), 5);
+        // Sholat & imsak tidak terpengaruh.
+        assert_eq!(geser.subuh, murni.subuh);
+        assert_eq!(geser.imsak, murni.imsak);
+        assert_eq!(geser.dzuhur, murni.dzuhur);
+    }
+
+    #[test]
+    fn dzuhur_jumat_berlabel_sholat_jumat() {
+        let s = jakarta();
+        // 2027-02-12 = Jumat; 13-an = Sabtu.
+        let jumat = NaiveDate::from_ymd_opt(2027, 2, 12).unwrap();
+        let sabtu = NaiveDate::from_ymd_opt(2027, 2, 13).unwrap();
+
+        assert_eq!(
+            nama_hari_ini(PrayerKind::Dzuhur, s.language, jumat),
+            "Sholat Jumat"
+        );
+        assert_eq!(
+            nama_hari_ini(PrayerKind::Dzuhur, s.language, sabtu),
+            "Dzuhur"
+        );
+        // Sholat lain tak berubah di Jumat.
+        assert_eq!(nama_hari_ini(PrayerKind::Ashar, s.language, jumat), "Ashar");
+    }
+
+    #[test]
     fn next_prayer_setelah_isya_menuju_subuh_esok() {
         let date = NaiveDate::from_ymd_opt(2026, 10, 15).unwrap();
         let t = day_times(&jakarta(), date).unwrap();
@@ -361,6 +517,92 @@ mod tests {
 
         // Tepat pada waktunya = nol.
         assert_eq!(time_until(hm(17, 50), hm(17, 50)), Duration::zero());
+    }
+
+    #[test]
+    fn dhuha_dan_bagi_malam_mengikuti_jadwal() {
+        let date = NaiveDate::from_ymd_opt(2026, 10, 15).unwrap();
+        let t = day_times(&jakarta(), date).unwrap();
+
+        // Dhuha = terbit + 20 menit.
+        assert_eq!(t.dhuha, t.terbit + Duration::minutes(20));
+
+        // Tengah malam & sepertiga malam berada di dalam malam
+        // (maghrib → subuh esok), berurutan, dan dibulatkan ke menit.
+        // Pakai time_until agar urutan tetap benar lintas tengah malam.
+        let malam = time_until(t.maghrib, t.subuh_esok);
+        let setengah = time_until(t.maghrib, t.tengah_malam);
+        let sepertiga = time_until(t.maghrib, t.sepertiga_malam);
+        assert!(setengah < sepertiga && sepertiga < malam);
+        assert_eq!(t.tengah_malam.second(), 0);
+        assert_eq!(t.sepertiga_malam.second(), 0);
+    }
+
+    #[test]
+    fn bagi_malam_rumus_dan_pembulatan() {
+        let hm = |h: u32, m: u32, s: u32| NaiveTime::from_hms_opt(h, m, s).unwrap();
+        // Malam 17:46:20 → 04:13:40 = 10j27m20s. Tengah = +5j13m40s = 23:00:00;
+        // ⅔ = +6j58m13,3s = 00:44:33,3 → dibulatkan 00:45 (lintas tengah malam).
+        let tengah = bagi_malam(hm(17, 46, 20), hm(4, 13, 40), 0.5);
+        let sepertiga = bagi_malam(hm(17, 46, 20), hm(4, 13, 40), 2.0 / 3.0);
+        assert_eq!(tengah, hm(23, 0, 0));
+        assert_eq!(sepertiga, hm(0, 45, 0));
+    }
+
+    #[test]
+    fn target_countdown_non_ramadan_beperilaku_lama() {
+        let date = NaiveDate::from_ymd_opt(2026, 10, 15).unwrap();
+        let t = day_times(&jakarta(), date).unwrap();
+        let hm = |h: u32, m: u32| NaiveTime::from_hms_opt(h, m, 0).unwrap();
+
+        let (kind, target) = match target_countdown(false, &t, hm(10, 0)) {
+            TargetHarian::Sholat(kind, target) => (kind, target),
+            TargetHarian::Imsak(_) => panic!("bukan imsak"),
+        };
+        assert_eq!(kind, PrayerKind::Dzuhur);
+        assert_eq!(target, t.dzuhur);
+    }
+
+    #[test]
+    fn target_countdown_ramadan_menuju_imsak() {
+        let date = NaiveDate::from_ymd_opt(2026, 10, 15).unwrap();
+        let t = day_times(&jakarta(), date).unwrap();
+        let imsak_esok = t.subuh_esok - Duration::minutes(10);
+
+        // Pra-imsak pagi ini.
+        let pra_imsak = t.imsak - Duration::minutes(60);
+        assert_eq!(
+            target_countdown(true, &t, pra_imsak),
+            TargetHarian::Imsak(t.imsak)
+        );
+
+        // Lintas tengah malam (00:30) tetap menuju imsak hari itu.
+        let dini = NaiveTime::from_hms_opt(0, 30, 0).unwrap();
+        assert_eq!(
+            target_countdown(true, &t, dini),
+            TargetHarian::Imsak(t.imsak)
+        );
+
+        // Jendela imsak–subuh: tetap tampil Subuh (bukan loncat ke imsak esok).
+        let antara = t.imsak + Duration::minutes(5);
+        assert_eq!(
+            target_countdown(true, &t, antara),
+            TargetHarian::Sholat(PrayerKind::Subuh, t.subuh)
+        );
+
+        // Setelah Isya → imsak esok (subuh esok − 10 menit).
+        let larut = NaiveTime::from_hms_opt(23, 30, 0).unwrap();
+        assert_eq!(
+            target_countdown(true, &t, larut),
+            TargetHarian::Imsak(imsak_esok)
+        );
+
+        // Siang hari (antara Ashar–Maghrib) → Maghrib tetap varian sholat
+        // (label berbuka oleh UI).
+        assert_eq!(
+            target_countdown(true, &t, NaiveTime::from_hms_opt(16, 0, 0).unwrap()),
+            TargetHarian::Sholat(PrayerKind::Maghrib, t.maghrib)
+        );
     }
 
     /// Helper debug: cetak jadwal hari ini memakai settings bawaan (Jakarta,

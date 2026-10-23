@@ -166,7 +166,7 @@ pub fn show_main() {
     win.set_focus();
 }
 
-/// Toggle widget dari tray/klik kiri ikon (tidak menyentuh window utama).
+/// Toggle widget dari menu tray (tidak menyentuh window utama).
 pub fn toggle_widget() {
     let visible = state::WIDGET_WINDOW
         .lock()
@@ -177,5 +177,17 @@ pub fn toggle_widget() {
         hide_widget();
     } else {
         show_widget();
+    }
+}
+
+/// Toggle window utama dari klik kiri ikon tray: sembunyikan bila tampak
+/// (tidak minimize), tampil + fokus bila tersembunyi atau minimize.
+/// Widget tidak tersentuh.
+pub fn toggle_main() {
+    let win = dioxus::desktop::window();
+    if win.is_visible() && !win.is_minimized() {
+        win.set_visible(false);
+    } else {
+        show_main();
     }
 }

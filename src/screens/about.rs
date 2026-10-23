@@ -31,6 +31,11 @@ pub fn AboutView() -> Element {
             tr(lang, "about_adzan"),
             tr(lang, "about_adzan_value").to_string(),
         ),
+        // Data Al-Qur'an ter-embed (screen Al-Qur'an) — atribusi sumber.
+        (
+            tr(lang, "about_quran"),
+            "Mushaf & Terjemahan Kemenag RI".to_string(),
+        ),
         (
             tr(lang, "about_source"),
             "github.com/mukhsin/rust-adzan".to_string(),

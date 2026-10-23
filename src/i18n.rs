@@ -18,6 +18,7 @@ const PHRASES: &[(&str, &str, &str)] = &[
     ("tab_daily", "Harian", "Daily"),
     ("tab_monthly", "Bulanan", "Monthly"),
     ("tab_kalender", "Kalender", "Calendar"),
+    ("tab_quran", "Al-Qur'an", "Qur'an"),
     ("tab_tentang", "Tentang", "About"),
     ("coming_soon", "Belum tersedia", "Not available yet"),
     ("col_tgl", "Tgl", "Date"),
@@ -50,9 +51,14 @@ const PHRASES: &[(&str, &str, &str)] = &[
     ("subuh", "Subuh", "Fajr"),
     ("terbit", "Terbit", "Sunrise"),
     ("dzuhur", "Dzuhur", "Dhuhr"),
+    ("sholat_jumat", "Sholat Jumat", "Friday Prayer"),
     ("ashar", "Ashar", "Asr"),
     ("maghrib", "Maghrib", "Maghrib"),
     ("isya", "Isya", "Isha"),
+    // Ekspor jadwal bulanan ke gambar
+    ("tgl", "Tanggal", "Date"),
+    ("hari", "Hari", "Day"),
+    ("dibuat_dengan", "Dibuat dengan", "Generated with"),
     // Toggle bell per sholat
     ("bell_on_title", "Mute adzan {nama}", "Mute {nama} adhan"),
     (
@@ -166,8 +172,68 @@ const PHRASES: &[(&str, &str, &str)] = &[
     ("f_time_format", "Format waktu", "Time format"),
     ("fmt_24", "24 jam", "24-hour"),
     ("fmt_12", "12 jam", "12-hour"),
+    // Settings — pembaruan
+    ("sec_update", "Pembaruan", "Update"),
+    (
+        "update_available_title",
+        "Versi {versi} tersedia",
+        "Version {versi} available",
+    ),
+    (
+        "update_available_sub",
+        "perbaikan & fitur baru siap dipasang",
+        "fixes & new features ready to install",
+    ),
+    (
+        "update_downloading_sub",
+        "mengunduh paket pembaruan…",
+        "downloading update package…",
+    ),
     // Settings — lainnya
     ("sec_misc", "Lainnya", "Other"),
+    // Kartu Waktu Lainnya (layar Harian)
+    ("waktu_lainnya", "Waktu Lainnya", "Other Times"),
+    (
+        "waktu_lainnya_sub",
+        "waktu tambahan · {zona}",
+        "extra times · {zona}",
+    ),
+    ("dhuha", "Dhuha", "Duha"),
+    ("tengah_malam", "Tengah Malam", "Midnight"),
+    ("sepertiga_malam", "Sepertiga Malam", "Last Third of Night"),
+    // Unduh gambar jadwal/kalender (layar Bulanan & Kalender)
+    ("unduh_btn", "Unduh Gambar", "Download Image"),
+    ("unduh_title", "Simpan gambar", "Save image"),
+    ("unduh_berhasil_title", "Gambar tersimpan", "Image saved"),
+    ("unduh_berhasil_body", "{nama}", "{nama}"),
+    (
+        "unduh_gagal_title",
+        "Gagal membuat gambar",
+        "Failed to create image",
+    ),
+    ("unduh_gagal_body", "{galat}", "{galat}"),
+    // Layar Al-Qur'an
+    ("quran_cari", "Cari surah…", "Search surah…"),
+    (
+        "quran_konteks",
+        "{n} SURAH · TERJEMAHAN KEMENAG",
+        "{n} SURAHS · KEMENAG TRANSLATION",
+    ),
+    ("quran_ayat_count", "{n} ayat", "{n} verses"),
+    ("quran_makkiyah", "Makkiyah", "Meccan"),
+    ("quran_madaniyah", "Madaniyah", "Medinan"),
+    (
+        "quran_surah_label",
+        "SURAH {n} · {ayat} AYAT · {jenis}",
+        "SURAH {n} · {ayat} VERSES · {jenis}",
+    ),
+    ("quran_sebelumnya", "Surah sebelumnya", "Previous surah"),
+    ("quran_berikutnya", "Surah berikutnya", "Next surah"),
+    (
+        "quran_tidak_ada",
+        "Tidak ada surah yang cocok.",
+        "No matching surah.",
+    ),
     // Layar Tentang
     (
         "about_tagline",
@@ -183,6 +249,7 @@ const PHRASES: &[(&str, &str, &str)] = &[
         "Embedded · customizable",
     ),
     ("about_source", "Sumber Kode", "Source code"),
+    ("about_quran", "Data Qur'an", "Qur'an data"),
     ("about_astronomis", "Astronomis", "Astronomical"),
     (
         "about_built",
@@ -275,6 +342,23 @@ const PHRASES: &[(&str, &str, &str)] = &[
         "update_failed_body",
         "Tidak bisa mengecek pembaruan — periksa koneksi.",
         "Could not check for updates — check your connection.",
+    ),
+    // Pemasangan satu klik (share kantor, installer silent)
+    (
+        "update_install_btn",
+        "Perbarui & Instal",
+        "Update & Install",
+    ),
+    ("update_installing", "Memperbarui…", "Updating…"),
+    (
+        "update_install_failed_title",
+        "Pembaruan gagal",
+        "Update failed",
+    ),
+    (
+        "update_install_failed_body",
+        "Installer tidak bisa dijalankan. Unduh manual dari folder rilis atau halaman rilis.",
+        "The installer could not be run. Download it manually from the release folder or page.",
     ),
     // Layar Harian — tanggal penting & kiblat
     ("sec_dates", "Tanggal Penting", "Important Dates"),

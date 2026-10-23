@@ -21,7 +21,7 @@ struct Row {
 }
 
 #[component]
-pub fn PrayerTable(times: DayTimes, now: NaiveTime, next_kind: PrayerKind) -> Element {
+pub fn PrayerTable(times: DayTimes, now: NaiveTime, jumat: bool, next_kind: PrayerKind) -> Element {
     let lang = state::settings().language;
     let settings = state::settings();
     // Setelah Isya, sholat berikutnya adalah Subuh ESOK: baris Subuh disorot
@@ -32,6 +32,8 @@ pub fn PrayerTable(times: DayTimes, now: NaiveTime, next_kind: PrayerKind) -> El
     // "Lewati adzan berikutnya" (tray) aktif → lonceng sholat berikutnya
     // tampil off, konsisten dengan centang di menu tray.
     let skip_aktif = state::skip_next_armed();
+    // Jumat: baris Dzuhur berlabel "Sholat Jumat".
+    let dzuhur_key = if jumat { "sholat_jumat" } else { "dzuhur" };
 
     let rows = [
         Row {
@@ -50,7 +52,7 @@ pub fn PrayerTable(times: DayTimes, now: NaiveTime, next_kind: PrayerKind) -> El
             kind: None,
         },
         Row {
-            key: "dzuhur",
+            key: dzuhur_key,
             time: times.dzuhur,
             kind: Some(PrayerKind::Dzuhur),
         },

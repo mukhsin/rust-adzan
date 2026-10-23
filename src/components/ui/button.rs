@@ -14,3 +14,7 @@ pub const BTN_CONFIRM: &str = "px-3 py-2 rounded-lg text-[13px] font-semibold bg
 
 /// Tombol aksi merah (Ya, reset).
 pub const BTN_DANGER: &str = "px-3 py-2 rounded-lg text-[13px] font-semibold bg-red-500 text-white hover:bg-red-600 transition-colors cursor-pointer";
+
+/// Tombol aksi aksen amber (Perbarui & Instal) — sorotan ala "Penanda
+/// Hari Ini" design system.
+pub const BTN_AMBER: &str = "flex items-center gap-2 px-3 py-2 rounded-lg text-[13px] font-semibold bg-amber text-amber-ink hover:brightness-105 transition-[filter] cursor-pointer disabled:opacity-60 disabled:cursor-wait";

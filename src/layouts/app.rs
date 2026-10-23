@@ -6,7 +6,7 @@ use crate::layouts::tray::TraySetup;
 use crate::layouts::window;
 use crate::screens::{
     about::AboutView, calendar::CalendarView, daily::DailyView, monthly::MonthlyView,
-    settings::SettingsView,
+    quran::QuranView, settings::SettingsView,
 };
 use crate::state;
 use dioxus::prelude::*;
@@ -96,6 +96,7 @@ pub fn app() -> Element {
                 Tab::Harian => rsx! { DailyView {} },
                 Tab::Bulanan => rsx! { MonthlyView {} },
                 Tab::Kalender => rsx! { CalendarView {} },
+                Tab::Quran => rsx! { QuranView {} },
             }
         }
     }

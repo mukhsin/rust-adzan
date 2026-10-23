@@ -32,13 +32,23 @@ const KOLOM_ARAB: [&str; 7] = [
 ];
 
 /// Nama pasaran siklus 5 hari Jawa.
-const PASARAN: [&str; 5] = ["Legi", "Pahing", "Pon", "Wage", "Kliwon"];
+pub(crate) const PASARAN: [&str; 5] = ["Legi", "Pahing", "Pon", "Wage", "Kliwon"];
 
 /// Neptu hari: indeks = `num_days_from_sunday` (Ahad 5 … Sabtu 9).
 const NEPTU_HARI: [u32; 7] = [5, 4, 3, 7, 8, 6, 9];
 
 /// Neptu pasaran: indeks = siklus [`PASARAN`] (Legi 5 … Kliwon 8).
 const NEPTU_PASARAN: [u32; 5] = [5, 9, 7, 4, 8];
+
+/// Info weton satu tanggal: (tanggal Jawa = tanggal hijriah, nama pasaran,
+/// neptu). Dipakai layar Kalender dan renderer ekspor gambar.
+pub(crate) fn info_weton(date: NaiveDate) -> (u32, &'static str, u32) {
+    let weekday = date.weekday().num_days_from_sunday() as usize;
+    let pasaran = PASARAN[pasaran_index(date)];
+    let neptu = NEPTU_HARI[weekday] + NEPTU_PASARAN[pasaran_index(date)];
+    let (_, _, h_d) = hijri::to_hijri(date);
+    (h_d, pasaran, neptu)
+}
 
 #[component]
 pub fn CalendarView() -> Element {
@@ -124,6 +134,23 @@ pub fn CalendarView() -> Element {
                         span { class: "font-mono text-[10.5px] font-semibold tracking-[0.08em] uppercase text-amber-ink",
                             "{today.day()} · {tr(lang, \"today\")}"
                         }
+                    }
+                }
+                // Unduh kalender bulan aktif sebagai gambar siap cetak.
+                Tooltip { label: tr(lang, "unduh_btn").to_string(), posisi: PosisiTooltip::Bawah,
+                    button {
+                        class: "flex items-center gap-1.5 bg-pass border border-pass-line rounded-lg px-3 py-1.5 text-[12.5px] font-semibold text-ink-2 hover:text-ink hover:border-ink-3 transition-colors cursor-pointer",
+                        onclick: move |_| {
+                            let s = state::settings();
+                            crate::export::unduh_gambar(
+                                &s,
+                                crate::export::JenisUnduhan::Kalender,
+                                year,
+                                month,
+                            );
+                        },
+                        icons::IconDownload { class: "w-4 h-4" }
+                        "{tr(lang, \"unduh_btn\")}"
                     }
                 }
             }
@@ -296,7 +323,7 @@ pub fn CalendarView() -> Element {
 }
 
 /// Angka Latin → angka Arab-Indic (٠–٩) untuk tanggal hijriah.
-fn arabic_numerals(n: u32) -> String {
+pub(crate) fn arabic_numerals(n: u32) -> String {
     n.to_string()
         .chars()
         .map(|c| char::from_u32(0x0660 + c.to_digit(10).expect("digit")).expect("arabic digit"))
@@ -306,7 +333,7 @@ fn arabic_numerals(n: u32) -> String {
 /// Indeks pasaran (0 = Legi … 4 = Kliwon) untuk tanggal.
 /// Anchor: 26 September 2026 = Legi (indeks 0), dikalibrasi dari design
 /// system (27 Sep 2026 = Pahing).
-fn pasaran_index(date: NaiveDate) -> usize {
+pub(crate) fn pasaran_index(date: NaiveDate) -> usize {
     let anchor = NaiveDate::from_ymd_opt(2026, 9, 26).expect("tanggal valid");
     let diff = (date - anchor).num_days();
     (((diff % 5) + 5) % 5) as usize

@@ -161,35 +161,36 @@ pub fn start() {
 fn execute(action: Action, settings: &Settings) {
     use crate::i18n::tr;
     let lang = settings.language;
+    // Nama sholat sesuai konteks tanggal — Dzuhur pada Jumat = "Sholat Jumat".
+    let today = crate::prayer::now_in_tz(settings).date_naive();
+    let nama = |kind: PrayerKind| crate::prayer::nama_hari_ini(kind, lang, today);
     match action {
         Action::PlayAdzan(kind) => {
             let subuh = kind == PrayerKind::Subuh;
             match crate::audio::play_adzan(settings, subuh) {
                 Ok(()) => {
-                    crate::logger::info(&format!("masuk waktu {}: adzan diputar", kind.nama(lang)))
+                    crate::logger::info(&format!("masuk waktu {}: adzan diputar", nama(kind)))
                 }
-                Err(e) => {
-                    crate::logger::error(&format!("gagal memutar adzan {}: {e}", kind.nama(lang)))
-                }
+                Err(e) => crate::logger::error(&format!("gagal memutar adzan {}: {e}", nama(kind))),
             }
         }
         Action::NotifyAdzan(kind) => {
             crate::notify::show(
                 tr(lang, "notif_adzan_title"),
-                &tr(lang, "notif_adzan_body").replace("{nama}", kind.nama(lang)),
+                &tr(lang, "notif_adzan_body").replace("{nama}", nama(kind)),
             );
-            crate::logger::info(&format!("notifikasi masuk waktu {}", kind.nama(lang)));
+            crate::logger::info(&format!("notifikasi masuk waktu {}", nama(kind)));
         }
         Action::NotifyPre { kind, minutes } => {
             crate::notify::show(
                 tr(lang, "notif_pre_title"),
                 &tr(lang, "notif_pre_body")
                     .replace("{minutes}", &minutes.to_string())
-                    .replace("{nama}", kind.nama(lang)),
+                    .replace("{nama}", nama(kind)),
             );
             crate::logger::info(&format!(
                 "notifikasi pengingat {} ({minutes} menit)",
-                kind.nama(lang)
+                nama(kind)
             ));
         }
         Action::NotifyImsak => {

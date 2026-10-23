@@ -1,7 +1,8 @@
-//! Layar Harian — kartu tiket (identik dengan widget) berdampingan dengan
-//! panel info: kartu Tanggal Penting (status Ramadan + acara terdekat) dan
-//! kartu Arah Kiblat (bearing + jarum kompas). Kartu memakai bahasa visual
-//! kartu grup pengaturan (bg-pass, radius 14, shadow lembut).
+//! Layar Harian — grid dua kolom ala frame "Harian" design system pen:
+//! kiri kartu tiket (identik dengan widget) di atas kartu Tanggal Penting
+//! (status Ramadan + acara terdekat); kanan kartu Waktu Lainnya (Dhuha,
+//! tengah malam, sepertiga malam) di atas kartu Arah Kiblat. Kartu memakai
+//! bahasa visual kartu grup pengaturan (bg-pass, radius 14, shadow lembut).
 
 use crate::components::ticket::{Ticket, tanggal_labels};
 use crate::dates::{self, RamadanStatus};
@@ -9,7 +10,7 @@ use crate::i18n::tr;
 use crate::prayer;
 use crate::qibla;
 use crate::state;
-use chrono::NaiveDate;
+use chrono::{Datelike, NaiveDate};
 use dioxus::prelude::*;
 
 #[component]
@@ -34,21 +35,28 @@ pub fn DailyView() -> Element {
         div { class: "flex-1 flex items-center justify-center gap-[18px] p-4",
             match prayer::day_times(&settings, now.date_naive()) {
                 Some(times) => rsx! {
-                    // Ukuran alami kartu widget; dibulatkan + diberi shadow
-                    // agar duduk sebagai kartu di atas lembar.
-                    div { class: "w-[600px] h-[300px] rounded-[14px] shadow-[0_8px_18px_#14161a1a] dark:shadow-[0_8px_18px_#00000080] overflow-hidden",
-                        Ticket {
-                            times: times,
-                            now: now.time(),
-                            tz: tz,
-                            hari: hari,
-                            tanggal: tanggal,
-                            tanggal_hijri: tanggal_hijri,
-                            ramadan_day: dates::ramadan_day(now.date_naive()),
+                    // Grid 2 kolom ala frame "Harian" design system pen:
+                    // kiri tiket widget + Tanggal Penting, kanan Waktu
+                    // Lainnya + Arah Kiblat (tinggi mengikuti tiket 300px).
+                    div { class: "w-[600px] flex flex-col gap-[18px]",
+                        // Ukuran alami kartu widget; dibulatkan + diberi shadow
+                        // agar duduk sebagai kartu di atas lembar.
+                        div { class: "h-[300px] rounded-[14px] shadow-[0_8px_18px_#14161a1a] dark:shadow-[0_8px_18px_#00000080] overflow-hidden",
+                            Ticket {
+                                times: times,
+                                now: now.time(),
+                                jumat: now.weekday() == chrono::Weekday::Fri,
+                                tz: tz.clone(),
+                                hari: hari,
+                                tanggal: tanggal,
+                                tanggal_hijri: tanggal_hijri,
+                                ramadan_day: dates::ramadan_day(now.date_naive()),
+                            }
                         }
-                    }
-                    div { class: "w-[320px] h-[300px] flex flex-col gap-[18px]",
                         DatesCard { today: now.date_naive() }
+                    }
+                    div { class: "w-[300px] h-[520px] flex flex-col gap-[18px]",
+                        WaktuLainnyaCard { times: times, zona: tz.clone() }
                         QiblaCard { lat: settings.lat, lng: settings.lng }
                     }
                 },
@@ -57,6 +65,46 @@ pub fn DailyView() -> Element {
                         span { class: "text-sm text-ink-3", "{tr(lang, \"calc_failed\")}" }
                     }
                 },
+            }
+        }
+    }
+}
+
+/// Kartu Waktu Lainnya: Dhuha, tengah malam syar'i, dan sepertiga malam
+/// akhir — waktu tambahan di luar lima sholat (ala frame "Harian" pen).
+#[component]
+fn WaktuLainnyaCard(times: prayer::DayTimes, zona: String) -> Element {
+    let settings = state::settings();
+    let lang = settings.language;
+    let sub = tr(lang, "waktu_lainnya_sub").replace("{zona}", &zona);
+    let baris = [
+        (
+            "dhuha",
+            prayer::format_time(times.dhuha, settings.time_format_24),
+        ),
+        (
+            "tengah_malam",
+            prayer::format_time(times.tengah_malam, settings.time_format_24),
+        ),
+        (
+            "sepertiga_malam",
+            prayer::format_time(times.sepertiga_malam, settings.time_format_24),
+        ),
+    ];
+
+    rsx! {
+        div { class: "h-[300px] bg-pass rounded-[14px] shadow-[0_8px_18px_#14161a1a] dark:shadow-[0_8px_18px_#00000080] px-[22px] pt-3.5 pb-2 flex flex-col",
+            div { class: "font-mono text-[11px] font-semibold tracking-[0.14em] uppercase text-ink-3",
+                "{tr(lang, \"waktu_lainnya\")}"
+            }
+            // div { class: "text-[11px] text-ink-3 mb-1", "{sub}" }
+            div { class: "flex-1 flex flex-col justify-center",
+                for (kunci, waktu) in baris {
+                    div { class: "font-count flex items-center justify-between gap-2 py-[13px] border-t border-hairline first:border-t-0",
+                        span { class: "text-[13.5px] font-semibold text-ink-2 uppercase", "{tr(lang, kunci)}" }
+                        span { class: "text-[17px] font-bold tabular-nums text-ink", "{waktu}" }
+                    }
+                }
             }
         }
     }
@@ -81,7 +129,7 @@ fn DatesCard(today: NaiveDate) -> Element {
     };
 
     rsx! {
-        div { class: "flex-1 bg-pass rounded-[14px] shadow-[0_8px_18px_#14161a1a] dark:shadow-[0_8px_18px_#00000080] px-[22px] pt-3.5 pb-2 flex flex-col justify-between",
+        div { class: "h-[202px] bg-pass rounded-[14px] shadow-[0_8px_18px_#14161a1a] dark:shadow-[0_8px_18px_#00000080] px-[22px] pt-3.5 pb-2 flex flex-col justify-between",
             div { class: "font-mono text-[11px] font-semibold tracking-[0.14em] uppercase text-ink-3",
                 "{tr(lang, \"sec_dates\")}"
             }

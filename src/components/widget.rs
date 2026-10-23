@@ -7,6 +7,7 @@ use crate::i18n::tr;
 use crate::layouts::window;
 use crate::prayer;
 use crate::state;
+use chrono::Datelike as _;
 use dioxus::prelude::*;
 
 /// Root komponen widget window.
@@ -70,6 +71,7 @@ pub fn WidgetApp() -> Element {
                     Ticket {
                         times: times,
                         now: now.time(),
+                        jumat: now.weekday() == chrono::Weekday::Fri,
                         tz: now.format("%Z").to_string(),
                         hari: hari,
                         tanggal: tanggal,

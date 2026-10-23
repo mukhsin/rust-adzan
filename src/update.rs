@@ -222,6 +222,7 @@ pub fn start() {
                     } else if let Some((release, sumber)) =
                         latest_overall().filter(|(r, _)| lebih_baru(&r.tag))
                     {
+                        catat_tersedia(&release, sumber);
                         // Cek terjadwal: hanya bersuara bila ada versi baru
                         // yang belum pernah diberitahukan.
                         let mut state = load_state();
@@ -256,11 +257,19 @@ pub enum HasilCek {
 /// Jalankan cek dua sumber (blocking: HTTP + UNC — panggil dari thread
 /// sendiri, bukan UI).
 pub fn cek_sekarang() -> HasilCek {
-    match latest_overall() {
+    let hasil = match latest_overall() {
         Some((release, sumber)) if lebih_baru(&release.tag) => HasilCek::Tersedia(release, sumber),
         Some(_) => HasilCek::Terbaru,
         None => HasilCek::Gagal,
+    };
+    match &hasil {
+        HasilCek::Tersedia(release, sumber) => catat_tersedia(release, *sumber),
+        // Sudah terbaru: hapus memo tombol pasang agar tidak menampilkan
+        // versi basi dari cek sebelumnya.
+        HasilCek::Terbaru => *tersedia_lock() = None,
+        HasilCek::Gagal => {}
     }
+    hasil
 }
 
 /// Toast hasil cek manual sesuai jenisnya.
@@ -306,6 +315,117 @@ pub fn check_now_manual() {
             MANUAL_BERJALAN.store(false, Ordering::Relaxed);
         })
         .expect("gagal spawn cek manual");
+}
+
+/// Rilis terbaru yang tersedia (hasil cek terakhir) + sumbernya — dibaca
+/// UI untuk menampilkan tombol pasang. Kosong = tidak ada yang bisa
+/// dipasang.
+static TERSEDIA: std::sync::Mutex<Option<(Release, Sumber)>> = std::sync::Mutex::new(None);
+
+fn tersedia_lock() -> std::sync::MutexGuard<'static, Option<(Release, Sumber)>> {
+    // Poisoned lock tidak merusak apa pun (isi selalu Option valid).
+    TERSEDIA
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+}
+
+fn catat_tersedia(release: &Release, sumber: Sumber) {
+    *tersedia_lock() = Some((release.clone(), sumber));
+}
+
+/// Versi yang bisa dipasang dari hasil cek terakhir.
+pub fn versi_tersedia() -> Option<(Release, Sumber)> {
+    tersedia_lock().clone()
+}
+
+/// Path installer di share kantor untuk rilis share: `<root>\vX.Y.Z\Jadwal
+/// Sholat X.Y.Z x64-setup.exe`. Murni penyusunan path (tanpa akses disk).
+fn installer_path(release: &Release) -> Option<std::path::PathBuf> {
+    let tag = release.tag.trim();
+    let versi = tag.trim_start_matches(['v', 'V']);
+    Some(
+        std::path::Path::new(SHARE_ROOT)
+            .join(tag)
+            .join(format!("Jadwal Sholat {versi} x64-setup.exe")),
+    )
+}
+
+/// Status pemasangan — dipoll UI (150 ms) untuk spinner tombol.
+static PASANG_BERJALAN: AtomicBool = AtomicBool::new(false);
+
+/// `true` selama alur pasang berjalan (tombol UI menampilkan spinner).
+pub fn pasang_berjalan() -> bool {
+    PASANG_BERJALAN.load(Ordering::Relaxed)
+}
+
+/// Pasang rilis tersedia dengan satu klik (sumber share kantor): salin
+/// installer ke %TEMP%, jalankan silent (/S), lalu keluar — installer
+/// me-restart aplikasi di akhir. Bila gagal, toast tampil dan aplikasi
+/// tetap hidup. Re-entry diabaikan.
+pub fn pasang_sekarang() {
+    if PASANG_BERJALAN.swap(true, Ordering::Relaxed) {
+        return;
+    }
+    std::thread::Builder::new()
+        .name("update-pasang".into())
+        .spawn(|| {
+            if let Err(e) = lakukan_pasang() {
+                crate::logger::error(&format!("pasang update gagal: {e}"));
+                let lang = crate::state::settings().language;
+                crate::notify::show(
+                    crate::i18n::tr(lang, "update_install_failed_title"),
+                    crate::i18n::tr(lang, "update_install_failed_body"),
+                );
+                PASANG_BERJALAN.store(false, Ordering::Relaxed);
+            }
+            // Sukses: [`lakukan_pasang`] sudah memanggil exit(0).
+        })
+        .expect("gagal spawn pasang update");
+}
+
+/// Badan alur pasang. Sukses tidak kembali (proses keluar).
+fn lakukan_pasang() -> Result<(), String> {
+    let (release, sumber) = versi_tersedia().ok_or("tidak ada rilis tersedia")?;
+    if sumber != Sumber::Share {
+        return Err(format!("pasang otomatis via {sumber:?} belum didukung"));
+    }
+    let sumber_file = installer_path(&release).ok_or("path installer tak bisa disusun")?;
+    let ukuran_sumber = std::fs::metadata(&sumber_file)
+        .map_err(|e| format!("installer tak terjangkau: {e}"))?
+        .len();
+
+    // Salin dulu ke %TEMP%: jangan eksekusi langsung dari share (koneksi
+    // bisa putus di tengah instalasi, dan file network terkunci lebih rawan).
+    let dir = std::env::temp_dir().join("jadwal-sholat-update");
+    std::fs::create_dir_all(&dir).map_err(|e| format!("folder temp gagal: {e}"))?;
+    let tujuan = dir.join(sumber_file.file_name().ok_or("nama installer aneh")?);
+    std::fs::copy(&sumber_file, &tujuan).map_err(|e| format!("salin installer gagal: {e}"))?;
+    let ukuran_tujuan = std::fs::metadata(&tujuan)
+        .map_err(|e| format!("salinan tak terbaca: {e}"))?
+        .len();
+    if ukuran_tujuan != ukuran_sumber {
+        return Err(format!(
+            "salinan beda ukuran: share={ukuran_sumber} temp={ukuran_tujuan}"
+        ));
+    }
+
+    crate::logger::info(&format!(
+        "menjalankan installer silent: {}",
+        tujuan.display()
+    ));
+    use std::os::windows::process::CommandExt;
+    const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+    std::process::Command::new(&tujuan)
+        .arg("/S")
+        .creation_flags(CREATE_NO_WINDOW)
+        .spawn()
+        .map_err(|e| format!("menjalankan installer gagal: {e}"))?;
+
+    // Beri installer waktu start, lalu keluar agar taskkill di installer
+    // (bila perlu) tidak bingung — app di-restart otomatis oleh installer.
+    std::thread::sleep(std::time::Duration::from_millis(500));
+    crate::logger::info("keluar untuk pemasangan versi baru");
+    std::process::exit(0);
 }
 
 #[cfg(test)]
@@ -362,5 +482,32 @@ mod tests {
         assert_eq!(latest_from_share_dir(&root), None);
 
         std::fs::remove_dir_all(&root).ok();
+    }
+
+    #[test]
+    fn installer_path_susun_konvensi_share() {
+        // Konvensi sama dengan `just publish-share`: folder vX.Y.Z berisi
+        // "Jadwal Sholat X.Y.Z x64-setup.exe".
+        let release = Release {
+            tag: "v1.4.0".into(),
+            url: "apa-saja".into(),
+        };
+        let path = installer_path(&release).expect("path tersusun");
+        let nama = path.file_name().unwrap().to_string_lossy();
+        assert_eq!(nama, "Jadwal Sholat 1.4.0 x64-setup.exe");
+        assert!(path.to_string_lossy().contains("v1.4.0"));
+
+        // Tag tanpa 'v' dipakai apa adanya sebagai nama folder (nama folder
+        // share selalu persis seperti hasil pemindaian).
+        let telanjang = Release {
+            tag: "1.4.0".into(),
+            url: String::new(),
+        };
+        let path_telanjang = installer_path(&telanjang).expect("path tersusun");
+        assert!(
+            path_telanjang
+                .to_string_lossy()
+                .ends_with("1.4.0\\Jadwal Sholat 1.4.0 x64-setup.exe")
+        );
     }
 }

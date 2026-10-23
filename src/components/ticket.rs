@@ -31,6 +31,7 @@ pub fn tanggal_labels(lang: Language, now: &DateTime<Tz>) -> (String, String, St
 pub fn Ticket(
     times: DayTimes,
     now: NaiveTime,
+    jumat: bool,
     tz: String,
     hari: String,
     tanggal: String,
@@ -46,6 +47,7 @@ pub fn Ticket(
             CountdownPane {
                 times: times,
                 now: now,
+                jumat: jumat,
                 tz: tz,
                 hari: hari,
                 tanggal: tanggal,
@@ -60,7 +62,7 @@ pub fn Ticket(
             }
 
             // PAPAN JADWAL HARI INI.
-            PrayerTable { times: times, now: now, next_kind: next_kind }
+            PrayerTable { times: times, now: now, jumat: jumat, next_kind: next_kind }
         }
     }
 }

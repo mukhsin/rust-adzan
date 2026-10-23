@@ -100,9 +100,13 @@ pub struct Settings {
     /// tidak ada pemutaran audio, notifikasi tetap jalan.
     pub muted_prayers: Vec<crate::prayer::PrayerKind>,
     /// Koreksi manual menit per sholat (−30..=30): selaraskan jadwal dengan
-    /// masjid setempat yang selisih dari perhitungan astronomis. Terbit tidak
-    /// punya offset; imsak selalu mengikuti Subuh yang sudah terkoreksi.
+    /// masjid setempat yang selisih dari perhitungan astronomis. Terbit punya
+    /// offset terpisah ( [`Self::terbit_offset`] ); imsak selalu mengikuti
+    /// Subuh yang sudah terkoreksi.
     pub prayer_offsets: HashMap<crate::prayer::PrayerKind, i32>,
+    /// Koreksi manual menit untuk Terbit (−30..=30) — di luar map karena
+    /// bukan sholat wajib (tanpa adzan). Dhuha mengikuti Terbit.
+    pub terbit_offset: i32,
     /// Toast saat masuk waktu imsak.
     pub imsak_notif: bool,
     /// Periksa rilis baru via GitHub Releases saat startup & tiap 12 jam.
@@ -131,6 +135,7 @@ impl Default for Settings {
             language: Language::Id,
             muted_prayers: Vec::new(),
             prayer_offsets: HashMap::new(),
+            terbit_offset: 0,
             imsak_notif: true,
             update_check: true,
         }
@@ -155,6 +160,11 @@ impl Settings {
             .copied()
             .unwrap_or(0)
             .clamp(-30, 30)
+    }
+
+    /// Offset terkoreksi (menit) untuk Terbit; dibatasi ±30 seperti sholat.
+    pub fn offset_terbit(&self) -> i32 {
+        self.terbit_offset.clamp(-30, 30)
     }
 }
 

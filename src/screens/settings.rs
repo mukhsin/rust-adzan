@@ -5,7 +5,7 @@
 
 use crate::autostart;
 use crate::cities::{CITIES, find_city};
-use crate::components::ui::button::{BTN, BTN_ICON};
+use crate::components::ui::button::{BTN, BTN_AMBER, BTN_ICON};
 use crate::components::ui::drop_search::DropSearch;
 use crate::components::ui::form::INPUT;
 use crate::components::ui::group::{Group, Row};
@@ -60,21 +60,22 @@ pub fn SettingsView() -> Element {
     });
 
     rsx! {
-        div { class: "flex-1 p-4 flex flex-col gap-[18px] overflow-y-auto",
+        div { class: "flex-1 p-4 flex flex-col gap-[18px] overflow-y-auto overflow-x-hidden",
 
             // Grup pengaturan dua kolom ala frame "Pengaturan" di design
             // system: kiri LOKASI + AUDIO, kanan PERHITUNGAN + TAMPILAN +
-            // NOTIFIKASI + LAINNYA. items-start = kartu tak dipaksa sama
-            // tinggi, persis perilaku Baris Grup di pen.
+            // NOTIFIKASI + PEMBARUAN + LAINNYA. items-start = kartu tak
+            // dipaksa sama tinggi, persis perilaku Baris Grup di pen.
             div { class: "flex items-start gap-[18px]",
                 div { class: "flex-1 flex flex-col gap-[18px]",
                     LocationGroup { draft }
-                    AudioGroup { draft, playing_umum, playing_subuh }
-                    NotificationGroup { draft }
-                    // AppearanceGroup { draft }
+                    CalculationGroup { draft }
+                    UpdateGroup { draft }
                 }
                 div { class: "flex-1 flex flex-col gap-[18px]",
-                    CalculationGroup { draft }
+                    AudioGroup { draft, playing_umum, playing_subuh }
+                    NotificationGroup { draft }
+                    AppearanceGroup { draft }
                     MiscGroup { draft,
                         on_autostart_error: move |err: String| dialog.set(Dialog::AutostartError(err)),
                         on_reset: move |_| dialog.set(Dialog::ResetConfirm),
@@ -208,6 +209,14 @@ fn LocationGroup(draft: Signal<Settings>) -> Element {
     }
 }
 
+/// Satu baris koreksi menit: sholat wajib (map `prayer_offsets`) atau
+/// Terbit (field `terbit_offset` sendiri, bukan sholat adzan).
+#[derive(Debug, Clone, Copy)]
+enum EntriKoreksi {
+    Sholat(crate::prayer::PrayerKind),
+    Terbit,
+}
+
 /// Grup PERHITUNGAN: metode perhitungan, mazhab ashar, dan koreksi waktu
 /// per sholat (±30 menit — selaraskan jadwal dengan masjid setempat).
 #[component]
@@ -221,13 +230,29 @@ fn CalculationGroup(draft: Signal<Settings>) -> Element {
     let dasar_times =
         crate::prayer::day_times(&dasar, crate::prayer::now_in_tz(&dasar).date_naive());
 
-    // Baris koreksi: (kunci nama, sholat).
-    const BARIS_KOREKSI: [(&str, crate::prayer::PrayerKind); 5] = [
-        ("subuh", crate::prayer::PrayerKind::Subuh),
-        ("dzuhur", crate::prayer::PrayerKind::Dzuhur),
-        ("ashar", crate::prayer::PrayerKind::Ashar),
-        ("maghrib", crate::prayer::PrayerKind::Maghrib),
-        ("isya", crate::prayer::PrayerKind::Isya),
+    // Baris koreksi, urut kronologis: Subuh → Terbit → Dzuhur → … → Isya.
+    const BARIS_KOREKSI: [(&str, EntriKoreksi); 6] = [
+        (
+            "subuh",
+            EntriKoreksi::Sholat(crate::prayer::PrayerKind::Subuh),
+        ),
+        ("terbit", EntriKoreksi::Terbit),
+        (
+            "dzuhur",
+            EntriKoreksi::Sholat(crate::prayer::PrayerKind::Dzuhur),
+        ),
+        (
+            "ashar",
+            EntriKoreksi::Sholat(crate::prayer::PrayerKind::Ashar),
+        ),
+        (
+            "maghrib",
+            EntriKoreksi::Sholat(crate::prayer::PrayerKind::Maghrib),
+        ),
+        (
+            "isya",
+            EntriKoreksi::Sholat(crate::prayer::PrayerKind::Isya),
+        ),
     ];
 
     rsx! {
@@ -283,16 +308,26 @@ fn CalculationGroup(draft: Signal<Settings>) -> Element {
                     },
                 }
             }
-            for (key, kind) in BARIS_KOREKSI {
+            for (key, baris) in BARIS_KOREKSI {
                 {
-                    let offset = draft.read().offset_of(kind);
+                    // Offset & titik nol tergantung jenis baris — Terbit di
+                    // luar map offsets karena bukan sholat wajib (Dhuha
+                    // mengikuti Terbit).
+                    let (offset, waktu_dasar) = match baris {
+                        EntriKoreksi::Sholat(kind) => {
+                            (draft.read().offset_of(kind), dasar_times.map(|t| t.waktu(kind)))
+                        }
+                        EntriKoreksi::Terbit => {
+                            (draft.read().offset_terbit(), dasar_times.map(|t| t.terbit))
+                        }
+                    };
                     // Hint hanya saat dikoreksi: tampilkan jadwal bawaan agar
                     // user tahu titik nolnya.
                     let hint = if offset != 0 {
-                        dasar_times.map(|t| {
+                        waktu_dasar.map(|waktu| {
                             tr(lang, "offset_hint").replace(
                                 "{waktu}",
-                                &crate::prayer::format_time(t.waktu(kind), draft.read().time_format_24),
+                                &crate::prayer::format_time(waktu, draft.read().time_format_24),
                             )
                         })
                     } else {
@@ -304,17 +339,31 @@ fn CalculationGroup(draft: Signal<Settings>) -> Element {
                                 value: offset,
                                 on_decrease: move |_| {
                                     let mut s = draft.read().clone();
-                                    let next = (s.offset_of(kind) - 1).max(-30);
-                                    // 0 disimpan sebagai tanpa-entri agar config tetap ramping.
-                                    if next == 0 { s.prayer_offsets.remove(&kind); }
-                                    else { s.prayer_offsets.insert(kind, next); }
+                                    match baris {
+                                        EntriKoreksi::Sholat(kind) => {
+                                            let next = (s.offset_of(kind) - 1).max(-30);
+                                            // 0 disimpan sebagai tanpa-entri agar config tetap ramping.
+                                            if next == 0 { s.prayer_offsets.remove(&kind); }
+                                            else { s.prayer_offsets.insert(kind, next); }
+                                        }
+                                        EntriKoreksi::Terbit => {
+                                            s.terbit_offset = (s.offset_terbit() - 1).max(-30);
+                                        }
+                                    }
                                     apply_settings(draft, s);
                                 },
                                 on_increase: move |_| {
                                     let mut s = draft.read().clone();
-                                    let next = (s.offset_of(kind) + 1).min(30);
-                                    if next == 0 { s.prayer_offsets.remove(&kind); }
-                                    else { s.prayer_offsets.insert(kind, next); }
+                                    match baris {
+                                        EntriKoreksi::Sholat(kind) => {
+                                            let next = (s.offset_of(kind) + 1).min(30);
+                                            if next == 0 { s.prayer_offsets.remove(&kind); }
+                                            else { s.prayer_offsets.insert(kind, next); }
+                                        }
+                                        EntriKoreksi::Terbit => {
+                                            s.terbit_offset = (s.offset_terbit() + 1).min(30);
+                                        }
+                                    }
                                     apply_settings(draft, s);
                                 },
                             }
@@ -485,82 +534,14 @@ fn NotificationGroup(draft: Signal<Settings>) -> Element {
     }
 }
 
-/// Grup TAMPILAN: tema (ikut sistem / gelap / terang) + format jam 24/12.
+/// Grup TAMPILAN: tema (ikut sistem / gelap / terang), bahasa UI, dan
+/// format jam 24/12.
 #[component]
 fn AppearanceGroup(draft: Signal<Settings>) -> Element {
     let lang = state::settings().language;
 
     rsx! {
         Group { label: tr(lang, "sec_appearance"),
-            Row { label: tr(lang, "f_theme"),
-                Segmented {
-                    options: vec![
-                        ("system".to_string(), tr(lang, "theme_system").to_string()),
-                        ("dark".to_string(), tr(lang, "theme_dark").to_string()),
-                        ("light".to_string(), tr(lang, "theme_light").to_string()),
-                    ],
-                    active: match draft.read().theme {
-                        Theme::System => "system",
-                        Theme::Dark => "dark",
-                        Theme::Light => "light",
-                    }
-                    .to_string(),
-                    on_select: move |v: String| {
-                        let mut s = draft.read().clone();
-                        s.theme = match v.as_str() {
-                            "dark" => Theme::Dark,
-                            "light" => Theme::Light,
-                            _ => Theme::System,
-                        };
-                        apply_settings(draft, s);
-                    },
-                }
-            }
-            Row { label: tr(lang, "f_time_format"),
-                Segmented {
-                    options: vec![
-                        ("24".to_string(), tr(lang, "fmt_24").to_string()),
-                        ("12".to_string(), tr(lang, "fmt_12").to_string()),
-                    ],
-                    active: if draft.read().time_format_24 {
-                        "24".to_string()
-                    } else {
-                        "12".to_string()
-                    },
-                    on_select: move |v: String| {
-                        let mut s = draft.read().clone();
-                        s.time_format_24 = v == "24";
-                        apply_settings(draft, s);
-                    },
-                }
-            }
-        }
-    }
-}
-
-/// Grup LAINNYA: bahasa UI + auto-start saat Windows menyala.
-#[component]
-fn MiscGroup(
-    draft: Signal<Settings>,
-    on_autostart_error: EventHandler<String>,
-    on_reset: EventHandler<()>,
-) -> Element {
-    let lang = state::settings().language;
-    // Status cek pembaruan manual — tombol menampilkan spinner selama
-    // HTTP/UNC scan berjalan di thread latar (dipoll dari update.rs).
-    let mut cek_berjalan = use_signal(|| false);
-    use_future(move || async move {
-        loop {
-            tokio::time::sleep(std::time::Duration::from_millis(150)).await;
-            let berjalan = crate::update::cek_manual_berjalan();
-            if *cek_berjalan.read() != berjalan {
-                cek_berjalan.set(berjalan);
-            }
-        }
-    });
-
-    rsx! {
-        Group { label: tr(lang, "sec_misc"),
             Row { label: tr(lang, "f_theme"),
                 Segmented {
                     options: vec![
@@ -621,6 +602,42 @@ fn MiscGroup(
                     },
                 }
             }
+        }
+    }
+}
+
+/// Grup PEMBARUAN: mode cek pembaruan (manual/otomatis) + tombol cek
+/// manual, dan baris kedua kondisional saat ada versi baru — tombol
+/// "Perbarui & Instal" (installer silent dari share kantor).
+#[component]
+fn UpdateGroup(draft: Signal<Settings>) -> Element {
+    let lang = state::settings().language;
+    // Status cek manual & pemasangan — tombol menampilkan spinner selama
+    // HTTP/UNC scan atau copy+spawn installer berjalan di thread latar
+    // (dipoll dari update.rs tiap 150 ms).
+    let mut cek_berjalan = use_signal(|| false);
+    let mut memasang = use_signal(|| false);
+    let mut tersedia = use_signal(|| None::<String>);
+    use_future(move || async move {
+        loop {
+            tokio::time::sleep(std::time::Duration::from_millis(150)).await;
+            let berjalan = crate::update::cek_manual_berjalan();
+            if *cek_berjalan.read() != berjalan {
+                cek_berjalan.set(berjalan);
+            }
+            let pasang = crate::update::pasang_berjalan();
+            if *memasang.read() != pasang {
+                memasang.set(pasang);
+            }
+            let tag = crate::update::versi_tersedia().map(|(r, _)| r.tag);
+            if *tersedia.read() != tag {
+                tersedia.set(tag);
+            }
+        }
+    });
+
+    rsx! {
+        Group { label: tr(lang, "sec_update"),
             Row { label: tr(lang, "f_update_check"),
                 div { class: "flex items-center gap-2",
                     // Tombol cek hanya relevan di mode Manual — saat Otomatis
@@ -678,6 +695,56 @@ fn MiscGroup(
                     }
                 }
             }
+            // Baris kedua — hanya muncul saat ada versi baru dari cek
+            // terakhir (manual maupun otomatis). Label dinamis (mengandung
+            // nomor versi) sehingga tidak lewat komponen Row.
+            if let Some(tag) = tersedia() {
+                {
+                    let label = tr(lang, "update_available_title").replace("{versi}", &tag);
+                    let hint = if *memasang.read() {
+                        tr(lang, "update_downloading_sub").to_string()
+                    } else {
+                        tr(lang, "update_available_sub").to_string()
+                    };
+                    rsx! {
+                        div { class: "flex items-center justify-between gap-3 h-[58px] shrink-0 border-b border-hairline last:border-b-0",
+                            div { class: "flex flex-col gap-0.5 min-w-0",
+                                span { class: "text-[13.5px] font-semibold text-ink", "{label}" }
+                                span { class: "text-[11.5px] text-ink-3 truncate", "{hint}" }
+                            }
+                            button {
+                                class: "{BTN_AMBER} min-w-[160px] justify-center",
+                                disabled: *memasang.read(),
+                                onclick: move |_| {
+                                    // Re-entry di-guard di dalam pasang_sekarang.
+                                    crate::update::pasang_sekarang();
+                                },
+                                if *memasang.read() {
+                                    span { class: "w-[13px] h-[13px] rounded-full border-2 border-amber-ink/40 border-t-transparent animate-spin inline-block" }
+                                    "{tr(lang, \"update_installing\")}"
+                                } else {
+                                    "{tr(lang, \"update_install_btn\")}"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// Grup LAINNYA: auto-start saat Windows menyala + reset pengaturan.
+#[component]
+fn MiscGroup(
+    draft: Signal<Settings>,
+    on_autostart_error: EventHandler<String>,
+    on_reset: EventHandler<()>,
+) -> Element {
+    let lang = state::settings().language;
+
+    rsx! {
+        Group { label: tr(lang, "sec_misc"),
             Row { label: tr(lang, "f_autostart"),
                 Switch {
                     checked: draft.read().autostart,
