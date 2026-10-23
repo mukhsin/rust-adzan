@@ -11,9 +11,8 @@ use dioxus::prelude::*;
 
 pub use dioxus_icons::lucide::{
     Bell as IconBell, BellOff as IconBellOff, Check as IconCheck, ChevronDown as IconChevronDown,
-    ChevronLeft as IconChevronLeft, ChevronRight as IconChevronRight, Copy as IconRestore,
-    Download as IconDownload, Minus as IconMinus, Play as IconPlay, Search as IconSearch,
-    Square as IconSquare, X as IconClose,
+    Copy as IconRestore, Download as IconDownload, Minus as IconMinus, Play as IconPlay,
+    Search as IconSearch, Square as IconSquare, X as IconClose,
 };
 
 /// Ikon mosque — geometri persis `assets/mosque.svg` (desain multicolor),

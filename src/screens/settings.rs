@@ -16,7 +16,7 @@ use crate::components::ui::stepper::{OffsetStepper, Stepper};
 use crate::components::ui::switch::Switch;
 use crate::components::ui::tooltip::{PosisiTooltip, Tooltip};
 use crate::i18n::tr;
-use crate::settings::{CalcMethod, Language, MadhabChoice, Settings, Theme};
+use crate::settings::{CalcMethod, Language, MadhabChoice, QuranWaqf, Settings, Theme};
 use crate::state;
 use dioxus::prelude::*;
 use std::path::PathBuf;
@@ -60,7 +60,7 @@ pub fn SettingsView() -> Element {
     });
 
     rsx! {
-        div { class: "flex-1 p-4 flex flex-col gap-[18px] overflow-y-auto overflow-x-hidden",
+        div { class: "flex-1 px-4 pt-2 pb-6 flex flex-col gap-[18px] overflow-y-scroll overflow-x-hidden",
 
             // Grup pengaturan dua kolom ala frame "Pengaturan" di design
             // system: kiri LOKASI + AUDIO, kanan PERHITUNGAN + TAMPILAN +
@@ -70,12 +70,14 @@ pub fn SettingsView() -> Element {
                 div { class: "flex-1 flex flex-col gap-[18px]",
                     LocationGroup { draft }
                     CalculationGroup { draft }
-                    UpdateGroup { draft }
+                    QuranGroup { draft }
+                    AppearanceGroup { draft }
                 }
                 div { class: "flex-1 flex flex-col gap-[18px]",
                     AudioGroup { draft, playing_umum, playing_subuh }
                     NotificationGroup { draft }
-                    AppearanceGroup { draft }
+                    PuasaGroup { draft }
+                    UpdateGroup { draft }
                     MiscGroup { draft,
                         on_autostart_error: move |err: String| dialog.set(Dialog::AutostartError(err)),
                         on_reset: move |_| dialog.set(Dialog::ResetConfirm),
@@ -190,7 +192,9 @@ fn LocationGroup(draft: Signal<Settings>) -> Element {
             }
             Row { label: tr(lang, "f_tz"),
                 DropSearch {
-                    value: draft.read().timezone.clone(),
+                    // Trigger menampilkan label ramah yang sama dengan item
+                    // daftarnya — bukan nama mentah "Asia/Jakarta".
+                    value: label_zona_waktu(&draft.read().timezone),
                     active: draft.read().timezone.clone(),
                     options: ZONA_WAKTU
                         .iter()
@@ -534,6 +538,175 @@ fn NotificationGroup(draft: Signal<Settings>) -> Element {
     }
 }
 
+/// Grup AL-QUR'AN: terjemahan on/off, gaya baca (per ayat / mushaf), dan
+/// tampilan tanda waqf. Pindah ke mushaf mematikan switch terjemahan
+/// sekalian (mushaf selalu Arab murni — tidak ada kondisi disabled tapi
+/// masih on); kembali ke per ayat, user bisa menyalakannya lagi.
+#[component]
+fn QuranGroup(draft: Signal<Settings>) -> Element {
+    let lang = state::settings().language;
+    let mushaf = draft.read().quran_mushaf;
+
+    rsx! {
+        Group { label: tr(lang, "sec_quran"),
+            Row {
+                label: tr(lang, "f_quran_terjemahan"),
+                hint: if mushaf {
+                    tr(lang, "hint_terjemahan_mushaf").to_string()
+                } else {
+                    tr(lang, "hint_quran_terjemahan").to_string()
+                },
+                div { class: if mushaf { "opacity-40 pointer-events-none" } else { "" },
+                    Switch {
+                        checked: draft.read().quran_terjemahan,
+                        on_change: move |on| {
+                            let mut s = draft.read().clone();
+                            s.quran_terjemahan = on;
+                            apply_settings(draft, s);
+                        },
+                    }
+                }
+            }
+            Row { label: tr(lang, "f_quran_tampilan"),
+                Segmented {
+                    options: vec![
+                        ("ayat".to_string(), tr(lang, "quran_mode_ayat").to_string()),
+                        (
+                            "mushaf".to_string(),
+                            tr(lang, "quran_mode_mushaf").to_string(),
+                        ),
+                    ],
+                    active: if draft.read().quran_mushaf {
+                        "mushaf".to_string()
+                    } else {
+                        "ayat".to_string()
+                    },
+                    on_select: move |v: String| {
+                        let mut s = draft.read().clone();
+                        let mushaf = v == "mushaf";
+                        s.quran_mushaf = mushaf;
+                        // Mode mushaf selalu tanpa terjemahan — switch
+                        // terjemahan langsung dimatikan sekalian supaya
+                        // tidak ambigu (disabled tapi masih on).
+                        if mushaf {
+                            s.quran_terjemahan = false;
+                        }
+                        apply_settings(draft, s);
+                    },
+                }
+            }
+            Row { label: tr(lang, "f_quran_waqf"), hint: tr(lang, "hint_quran_waqf"),
+                Segmented {
+                    options: vec![
+                        (
+                            "tampil".to_string(),
+                            tr(lang, "quran_waqf_tampil").to_string(),
+                        ),
+                        ("redup".to_string(), tr(lang, "quran_waqf_redup").to_string()),
+                        (
+                            "sembunyi".to_string(),
+                            tr(lang, "quran_waqf_sembunyi").to_string(),
+                        ),
+                    ],
+                    active: match draft.read().quran_waqf {
+                        QuranWaqf::Tampil => "tampil",
+                        QuranWaqf::Redup => "redup",
+                        QuranWaqf::Sembunyi => "sembunyi",
+                    }
+                    .to_string(),
+                    on_select: move |v: String| {
+                        let mut s = draft.read().clone();
+                        s.quran_waqf = match v.as_str() {
+                            "redup" => QuranWaqf::Redup,
+                            "sembunyi" => QuranWaqf::Sembunyi,
+                            _ => QuranWaqf::Tampil,
+                        };
+                        apply_settings(draft, s);
+                    },
+                }
+            }
+        }
+    }
+}
+
+/// Grup PUASA SUNNAH: toast pengingat saat imsak + jenis puasa yang
+/// diikutkan (menentukan pil widget/Harian juga).
+#[component]
+fn PuasaGroup(draft: Signal<Settings>) -> Element {
+    use crate::puasa::PuasaSunnahKind;
+    let lang = state::settings().language;
+
+    // (jenis, kunci label, kunci hint opsional) — urut kanonik.
+    const JENIS: [(PuasaSunnahKind, &str, Option<&str>); 5] = [
+        (PuasaSunnahKind::Senin, "puasa_senin", None),
+        (PuasaSunnahKind::Kamis, "puasa_kamis", None),
+        (
+            PuasaSunnahKind::AyyamulBidh,
+            "puasa_ayyamul_bidh",
+            Some("hint_ayyamul_bidh"),
+        ),
+        (
+            PuasaSunnahKind::Syawal,
+            "puasa_syawal",
+            Some("hint_puasa_syawal"),
+        ),
+        (
+            PuasaSunnahKind::HariPenting,
+            "puasa_penting",
+            Some("hint_puasa_penting"),
+        ),
+    ];
+
+    rsx! {
+        Group { label: tr(lang, "sec_puasa"),
+            Row { label: tr(lang, "f_puasa_notif"), hint: tr(lang, "hint_puasa_notif"),
+                Switch {
+                    checked: draft.read().puasa_sunnah_notif,
+                    on_change: move |on| {
+                        let mut s = draft.read().clone();
+                        s.puasa_sunnah_notif = on;
+                        apply_settings(draft, s);
+                    },
+                }
+            }
+            Row { label: tr(lang, "f_puasa_notif_malam"), hint: tr(lang, "hint_puasa_notif_malam"),
+                Switch {
+                    checked: draft.read().puasa_sunnah_notif_malam,
+                    on_change: move |on| {
+                        let mut s = draft.read().clone();
+                        s.puasa_sunnah_notif_malam = on;
+                        apply_settings(draft, s);
+                    },
+                }
+            }
+            for (jenis, label, hint) in JENIS {
+                {
+                    let aktif = draft.read().puasa_sunnah.contains(&jenis);
+                    let hint = hint.map(|h| tr(lang, h).to_string());
+                    rsx! {
+                        Row { label: tr(lang, label), hint: hint,
+                            Switch {
+                                checked: aktif,
+                                on_change: move |on| {
+                                    let mut s = draft.read().clone();
+                                    if on {
+                                        if !s.puasa_sunnah.contains(&jenis) {
+                                            s.puasa_sunnah.push(jenis);
+                                        }
+                                    } else {
+                                        s.puasa_sunnah.retain(|k| *k != jenis);
+                                    }
+                                    apply_settings(draft, s);
+                                },
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
 /// Grup TAMPILAN: tema (ikut sistem / gelap / terang), bahasa UI, dan
 /// format jam 24/12.
 #[component]
@@ -811,6 +984,17 @@ fn method_from_name(s: &str) -> Option<CalcMethod> {
         "north_america" => Some(CalcMethod::NorthAmerica),
         _ => None,
     }
+}
+
+/// Label ramah untuk dropdown Zona Waktu — sama dengan label item
+/// daftarnya. Zona di luar daftar (mis. config diedit manual) jatuh ke
+/// nama mentahnya.
+fn label_zona_waktu(nama: &str) -> String {
+    ZONA_WAKTU
+        .iter()
+        .find(|(zona, _)| *zona == nama)
+        .map(|(_, label)| label.to_string())
+        .unwrap_or_else(|| nama.to_string())
 }
 
 fn pick_audio(lang: Language) -> Option<PathBuf> {

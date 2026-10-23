@@ -1,7 +1,8 @@
 //! Pane kiri kartu tiket: identitas + kota, hitung mundur ke sholat
 //! berikutnya, dan tiga label tanggal (hari / masehi / hijri).
 //! Saat Ramadhan (sebelum Maghrib): badge hari ke-N dan hitung mundur
-//! berlabel "Menuju Berbuka".
+//! berlabel "Menuju Berbuka". Di luar Ramadhan: pil puasa sunnah bila
+//! hari ini ada puasa yang diikutkan (gaya sama dengan badge Ramadhan).
 
 use crate::i18n::tr;
 use crate::prayer::{self, DayTimes, PrayerKind};
@@ -19,6 +20,7 @@ pub fn CountdownPane(
     tanggal: String,
     tanggal_hijri: String,
     ramadan_day: Option<u32>,
+    puasa: Option<String>,
 ) -> Element {
     let settings = state::settings();
     let lang = settings.language;
@@ -51,6 +53,9 @@ pub fn CountdownPane(
     let masuk = tr(lang, "masuk_pukul").replace("{waktu}", &jam_target);
     let badge_ramadan =
         ramadan_day.map(|day| tr(lang, "ramadan_badge").replace("{n}", &day.to_string()));
+    // Pil puasa sunnah hanya relevan di luar Ramadhan (puasa::* memang
+    // mengosongkan daftarnya saat Ramadhan) — awalan 🌙 mengikuti badge.
+    let pil_puasa = puasa.map(|label| format!("🌙 {label}"));
 
     rsx! {
         div { class: "flex-1",
@@ -63,6 +68,11 @@ pub fn CountdownPane(
                     if let Some(badge) = badge_ramadan {
                         span { class: "font-mono text-[10.5px] font-semibold tracking-[0.08em] uppercase text-amber truncate",
                             "{badge}"
+                        }
+                    }
+                    if let Some(pil) = pil_puasa {
+                        span { class: "font-mono text-[10.5px] font-semibold tracking-[0.08em] uppercase text-amber truncate",
+                            "{pil}"
                         }
                     }
                 }

@@ -43,7 +43,14 @@ pub fn WidgetApp() -> Element {
     let lang = settings.language;
     let dark = settings.theme.is_dark();
     let now = prayer::now_in_tz(&settings);
-    let (hari, tanggal, tanggal_hijri) = tanggal_labels(lang, &now);
+    let today = now.date_naive();
+    let times = prayer::day_times(&settings, today);
+    // Tanggal hijriah efektif (rollover di Maghrib) — dipakai label
+    // hijriah, badge Ramadan, dan pil puasa sunnah.
+    let tgl_hijri = times
+        .map(|t| prayer::tanggal_efektif_hijriah(&t, now.time(), today))
+        .unwrap_or(today);
+    let (hari, tanggal, tanggal_hijri) = tanggal_labels(lang, &now, tgl_hijri);
 
     let mut root_class =
         String::from("h-screen w-screen overflow-hidden select-none font-sans text-ink");
@@ -66,7 +73,7 @@ pub fn WidgetApp() -> Element {
             // Klik ganda kartu = buka pengaturan (tak ada tombol di desain).
             ondoubleclick: move |_| state::send_main_command(state::MainCommand::ShowMain),
 
-            match prayer::day_times(&settings, now.date_naive()) {
+            match times {
                 Some(times) => rsx! {
                     Ticket {
                         times: times,
@@ -76,7 +83,8 @@ pub fn WidgetApp() -> Element {
                         hari: hari,
                         tanggal: tanggal,
                         tanggal_hijri: tanggal_hijri,
-                        ramadan_day: crate::dates::ramadan_day(now.date_naive()),
+                        ramadan_day: crate::dates::ramadan_day(tgl_hijri),
+                        puasa: crate::puasa::label_gabung(lang, tgl_hijri, &settings.puasa_sunnah),
                     }
                 },
                 None => rsx! {

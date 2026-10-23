@@ -28,12 +28,19 @@ pub fn DailyView() -> Element {
     let settings = state::settings();
     let lang = settings.language;
     let now = prayer::now_in_tz(&settings);
+    let today = now.date_naive();
     let tz = now.format("%Z").to_string();
-    let (hari, tanggal, tanggal_hijri) = tanggal_labels(lang, &now);
+    let times = prayer::day_times(&settings, today);
+    // Tanggal hijriah efektif (rollover di Maghrib) — dipakai label
+    // hijriah, badge Ramadan, pil puasa, dan kartu Tanggal Penting.
+    let tgl_hijri = times
+        .map(|t| prayer::tanggal_efektif_hijriah(&t, now.time(), today))
+        .unwrap_or(today);
+    let (hari, tanggal, tanggal_hijri) = tanggal_labels(lang, &now, tgl_hijri);
 
     rsx! {
         div { class: "flex-1 flex items-center justify-center gap-[18px] p-4",
-            match prayer::day_times(&settings, now.date_naive()) {
+            match times {
                 Some(times) => rsx! {
                     // Grid 2 kolom ala frame "Harian" design system pen:
                     // kiri tiket widget + Tanggal Penting, kanan Waktu
@@ -50,13 +57,14 @@ pub fn DailyView() -> Element {
                                 hari: hari,
                                 tanggal: tanggal,
                                 tanggal_hijri: tanggal_hijri,
-                                ramadan_day: dates::ramadan_day(now.date_naive()),
+                                ramadan_day: dates::ramadan_day(tgl_hijri),
+                                puasa: crate::puasa::label_gabung(lang, tgl_hijri, &settings.puasa_sunnah),
                             }
                         }
-                        DatesCard { today: now.date_naive() }
+                        DatesCard { today: tgl_hijri }
                     }
                     div { class: "w-[300px] h-[520px] flex flex-col gap-[18px]",
-                        WaktuLainnyaCard { times: times, zona: tz.clone() }
+                        WaktuLainnyaCard { times: times }
                         QiblaCard { lat: settings.lat, lng: settings.lng }
                     }
                 },
@@ -73,10 +81,9 @@ pub fn DailyView() -> Element {
 /// Kartu Waktu Lainnya: Dhuha, tengah malam syar'i, dan sepertiga malam
 /// akhir — waktu tambahan di luar lima sholat (ala frame "Harian" pen).
 #[component]
-fn WaktuLainnyaCard(times: prayer::DayTimes, zona: String) -> Element {
+fn WaktuLainnyaCard(times: prayer::DayTimes) -> Element {
     let settings = state::settings();
     let lang = settings.language;
-    let sub = tr(lang, "waktu_lainnya_sub").replace("{zona}", &zona);
     let baris = [
         (
             "dhuha",
@@ -97,7 +104,6 @@ fn WaktuLainnyaCard(times: prayer::DayTimes, zona: String) -> Element {
             div { class: "font-mono text-[11px] font-semibold tracking-[0.14em] uppercase text-ink-3",
                 "{tr(lang, \"waktu_lainnya\")}"
             }
-            // div { class: "text-[11px] text-ink-3 mb-1", "{sub}" }
             div { class: "flex-1 flex flex-col justify-center",
                 for (kunci, waktu) in baris {
                     div { class: "font-count flex items-center justify-between gap-2 py-[13px] border-t border-hairline first:border-t-0",
@@ -110,12 +116,15 @@ fn WaktuLainnyaCard(times: prayer::DayTimes, zona: String) -> Element {
     }
 }
 
-/// Kartu Tanggal Penting: status Ramadan (menunggu / hari ke-N) + tiga
-/// peristiwa berikutnya dengan sisa hari.
+/// Kartu Tanggal Penting: status Ramadan (menunggu / hari ke-N), puasa
+/// sunnah, + tiga peristiwa berikutnya dengan sisa hari. `today` adalah
+/// tanggal hijriah efektif (sudah rollover di Maghrib).
 #[component]
 fn DatesCard(today: NaiveDate) -> Element {
-    let lang = state::settings().language;
+    let settings = state::settings();
+    let lang = settings.language;
     let ramadan = dates::ramadan_status(today);
+    let puasa = crate::puasa::label_gabung(lang, today, &settings.puasa_sunnah);
     let acara = dates::upcoming(today, 3);
 
     let ramadan_line = match ramadan {
@@ -132,6 +141,15 @@ fn DatesCard(today: NaiveDate) -> Element {
         div { class: "h-[202px] bg-pass rounded-[14px] shadow-[0_8px_18px_#14161a1a] dark:shadow-[0_8px_18px_#00000080] px-[22px] pt-3.5 pb-2 flex flex-col justify-between",
             div { class: "font-mono text-[11px] font-semibold tracking-[0.14em] uppercase text-ink-3",
                 "{tr(lang, \"sec_dates\")}"
+            }
+
+            // Puasa sunnah hari ini — tampil di atas status Ramadan bila
+            // ada (saling eksklusif: saat Ramadhan daftar sunnah kosong).
+            if let Some(pil) = puasa {
+                div { class: "flex items-center gap-2 mt-1.5",
+                    span { class: "w-1.5 h-1.5 rounded-full bg-amber shrink-0" }
+                    span { class: "text-[13.5px] font-bold text-ink truncate", "{pil}" }
+                }
             }
 
             // Status Ramadan — sorotan utama kartu.

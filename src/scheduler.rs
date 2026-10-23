@@ -15,6 +15,12 @@ pub enum Action {
     NotifyPre { kind: PrayerKind, minutes: u32 },
     /// Toast masuk waktu imsak (tanpa audio — imsak bukan adzan).
     NotifyImsak,
+    /// Toast pengingat puasa sunnah — berisi kunci i18n nama puasa hari
+    /// ini (urut kanonik dari `puasa::daftar_hari_ini`).
+    NotifyPuasa(Vec<&'static str>),
+    /// Toast persiapan puasa BESOK — 30 menit setelah Maghrib (hari
+    /// hijriah sudah berganti), isi kunci i18n puasa hari masehi esok.
+    NotifyPuasaBesok(Vec<&'static str>),
 }
 
 #[derive(Debug, Default)]
@@ -23,6 +29,8 @@ pub struct EngineState {
     played: HashSet<PrayerKind>,
     pre_notified: HashSet<PrayerKind>,
     imsak_notified: bool,
+    puasa_notified: bool,
+    puasa_malam_notified: bool,
 }
 
 impl EngineState {
@@ -44,6 +52,8 @@ pub fn tick(state: &mut EngineState, settings: &Settings, now: DateTime<Tz>) -> 
         state.played.clear();
         state.pre_notified.clear();
         state.imsak_notified = false;
+        state.puasa_notified = false;
+        state.puasa_malam_notified = false;
     }
 
     let Some(times) = day_times(settings, today) else {
@@ -52,6 +62,26 @@ pub fn tick(state: &mut EngineState, settings: &Settings, now: DateTime<Tz>) -> 
 
     let now_t = now.time();
     let tolerance = Duration::seconds(2);
+
+    // Toast pengingat puasa sunnah — juga di jendela imsak (waktu mulai
+    // puasa), SEBELUM blok imsak: bila keduanya jatuh di detik yang sama,
+    // toast puasa menggantikan toast imsak generik (informasinya superset:
+    // puasa dimulai = imsak), pola sama dengan imsak yang menggantikan
+    // pengingat Subuh.
+    if settings.notif_enabled && settings.puasa_sunnah_notif && !state.puasa_notified {
+        let imsak_secs = times.imsak.num_seconds_from_midnight() as i64;
+        let imsak_elapsed = now_t.num_seconds_from_midnight() as i64 - imsak_secs;
+        if (0..=2).contains(&imsak_elapsed) {
+            let puasa = crate::puasa::daftar_hari_ini(today, &settings.puasa_sunnah);
+            if !puasa.is_empty() {
+                state.puasa_notified = true;
+                // Toast imsak generik & pengingat Subuh tak perlu lagi.
+                state.imsak_notified = true;
+                state.pre_notified.insert(PrayerKind::Subuh);
+                actions.push(Action::NotifyPuasa(puasa));
+            }
+        }
+    }
 
     // Toast masuk waktu imsak — dijalankan SEBELUM loop sholat: bila imsak
     // dan pengingat Subuh jatuh di detik yang sama (imsak = Subuh − menit
@@ -65,6 +95,24 @@ pub fn tick(state: &mut EngineState, settings: &Settings, now: DateTime<Tz>) -> 
             // Pengingat sebelum Subuh hari ini dianggap terwakili.
             state.pre_notified.insert(PrayerKind::Subuh);
             actions.push(Action::NotifyImsak);
+        }
+    }
+
+    // Toast persiapan puasa BESOK — 30 menit setelah Maghrib (saat hari
+    // hijriah sudah berganti; saatnya orang menyiapkan sahur & niat).
+    // Yang diperiksa tetap tanggal masehi BESOK: puasa Senin tetap puasa
+    // siang Senin, jangan ikut rollover hijriah.
+    if settings.notif_enabled && settings.puasa_sunnah_notif_malam && !state.puasa_malam_notified {
+        let target = times.maghrib + Duration::minutes(30);
+        let target_secs = target.num_seconds_from_midnight() as i64;
+        let elapsed = now_t.num_seconds_from_midnight() as i64 - target_secs;
+        if (0..=2).contains(&elapsed) {
+            let besok = today.succ_opt().unwrap_or(today);
+            let puasa = crate::puasa::daftar_hari_ini(besok, &settings.puasa_sunnah);
+            if !puasa.is_empty() {
+                state.puasa_malam_notified = true;
+                actions.push(Action::NotifyPuasaBesok(puasa));
+            }
         }
     }
 
@@ -196,6 +244,30 @@ fn execute(action: Action, settings: &Settings) {
         Action::NotifyImsak => {
             crate::notify::show(tr(lang, "notif_imsak_title"), tr(lang, "notif_imsak_body"));
             crate::logger::info("notifikasi masuk waktu imsak");
+        }
+        Action::NotifyPuasa(kunci) => {
+            let daftar = kunci
+                .iter()
+                .map(|k| tr(lang, k))
+                .collect::<Vec<_>>()
+                .join(" & ");
+            crate::notify::show(
+                tr(lang, "notif_puasa_title"),
+                &tr(lang, "notif_puasa_body").replace("{daftar}", &daftar),
+            );
+            crate::logger::info(&format!("notifikasi puasa sunnah: {daftar}"));
+        }
+        Action::NotifyPuasaBesok(kunci) => {
+            let daftar = kunci
+                .iter()
+                .map(|k| tr(lang, k))
+                .collect::<Vec<_>>()
+                .join(" & ");
+            crate::notify::show(
+                tr(lang, "notif_puasa_besok_title"),
+                &tr(lang, "notif_puasa_besok_body").replace("{daftar}", &daftar),
+            );
+            crate::logger::info(&format!("notifikasi persiapan puasa besok: {daftar}"));
         }
     }
 }
@@ -407,7 +479,10 @@ mod tests {
 
     #[test]
     fn imsak_toast_tepat_waktu_dan_tidak_double() {
-        let s = settings_dengan_jadwal();
+        let mut s = settings_dengan_jadwal();
+        // Matikan pengingat puasa (15 Okt 2026 = Kamis) — toast imsak yang
+        // diuji terpisah dari toast puasa (lihat test di bawahnya).
+        s.puasa_sunnah_notif = false;
         let mut state = EngineState::new();
         let date = (2026, 10, 15);
         let times = day_times(&s, NaiveDate::from_ymd_opt(2026, 10, 15).unwrap()).unwrap();
@@ -438,6 +513,9 @@ mod tests {
     fn imsak_toast_matikan_lewat_setting() {
         let mut s = settings_dengan_jadwal();
         s.imsak_notif = false;
+        // Matikan juga pengingat puasa (15 Okt 2026 = Kamis) agar test
+        // murni soal toast imsak.
+        s.puasa_sunnah_notif = false;
         let mut state = EngineState::new();
         let times = day_times(&s, NaiveDate::from_ymd_opt(2026, 10, 15).unwrap()).unwrap();
         let now = fake_now(
@@ -458,8 +536,11 @@ mod tests {
         // Default: imsak = Subuh − 10 menit, pengingat juga 10 menit sebelum
         // Subuh → keduanya jatuh di detik yang sama. Toast imsak harus
         // menang; pengingat Subuh tidak boleh ikut terkirim.
-        let s = settings_dengan_jadwal();
+        let mut s = settings_dengan_jadwal();
         assert_eq!(s.pre_notif_minutes, 10);
+        // Matikan pengingat puasa (15 Okt 2026 = Kamis) agar toast imsak
+        // yang diuji, bukan toast puasa yang justru menggantikannya.
+        s.puasa_sunnah_notif = false;
         let mut state = EngineState::new();
         let date = (2026, 10, 15);
         let times = day_times(&s, NaiveDate::from_ymd_opt(2026, 10, 15).unwrap()).unwrap();
@@ -492,6 +573,8 @@ mod tests {
         let date = NaiveDate::from_ymd_opt(2026, 10, 15).unwrap();
         let mut s = settings_dengan_jadwal();
         s.prayer_offsets.insert(PrayerKind::Subuh, -5);
+        // Matikan pengingat puasa (15 Okt 2026 = Kamis) — fokus ke imsak.
+        s.puasa_sunnah_notif = false;
         let mut state = EngineState::new();
         let times = day_times(&s, date).unwrap();
         let now = fake_now(
@@ -505,5 +588,185 @@ mod tests {
         );
         let actions = tick(&mut state, &s, now);
         assert!(actions.contains(&Action::NotifyImsak), "{actions:?}");
+    }
+
+    #[test]
+    fn puasa_toast_kamis_menggantikan_imsak_dan_pengingat_subuh() {
+        // 15 Okt 2026 = Kamis → puasa sunnah default settings. Toast puasa
+        // di jendela imsak harus menggantikan toast imsak generik dan
+        // pengingat sebelum Subuh, lalu tidak dobel di tick berikutnya.
+        let s = settings_dengan_jadwal();
+        assert!(
+            s.puasa_sunnah
+                .contains(&crate::puasa::PuasaSunnahKind::Kamis)
+        );
+        let mut state = EngineState::new();
+        let date = (2026, 10, 15);
+        let times = day_times(&s, NaiveDate::from_ymd_opt(2026, 10, 15).unwrap()).unwrap();
+        let now = fake_now(
+            s.timezone(),
+            date,
+            (
+                times.imsak.hour(),
+                times.imsak.minute(),
+                times.imsak.second(),
+            ),
+        );
+        let actions = tick(&mut state, &s, now);
+        assert_eq!(
+            actions,
+            vec![Action::NotifyPuasa(vec!["puasa_kamis"])],
+            "{actions:?}"
+        );
+
+        // Tick berikutnya tidak dobel.
+        let actions = tick(&mut state, &s, now + Duration::seconds(1));
+        assert!(actions.is_empty(), "{actions:?}");
+    }
+
+    #[test]
+    fn puasa_toast_mengikuti_daftar_jenis_yang_diaktifkan() {
+        // 26 Okt 2026 = Senin + 15 Jumadil Awal (Ayyamul Bidh) → dua puasa
+        // sekaligus, urut kanonik.
+        let s = settings_dengan_jadwal();
+        let mut state = EngineState::new();
+        let date = (2026, 10, 26);
+        let times = day_times(&s, NaiveDate::from_ymd_opt(2026, 10, 26).unwrap()).unwrap();
+        let now = fake_now(
+            s.timezone(),
+            date,
+            (
+                times.imsak.hour(),
+                times.imsak.minute(),
+                times.imsak.second(),
+            ),
+        );
+        let actions = tick(&mut state, &s, now);
+        assert_eq!(
+            actions,
+            vec![Action::NotifyPuasa(vec![
+                "puasa_senin",
+                "puasa_ayyamul_bidh"
+            ])],
+            "{actions:?}"
+        );
+    }
+
+    #[test]
+    fn puasa_toast_mati_lewat_setting() {
+        let mut s = settings_dengan_jadwal();
+        s.puasa_sunnah_notif = false;
+        let mut state = EngineState::new();
+        let date = (2026, 10, 15); // Kamis
+        let times = day_times(&s, NaiveDate::from_ymd_opt(2026, 10, 15).unwrap()).unwrap();
+        let now = fake_now(
+            s.timezone(),
+            date,
+            (
+                times.imsak.hour(),
+                times.imsak.minute(),
+                times.imsak.second(),
+            ),
+        );
+        let actions = tick(&mut state, &s, now);
+        assert!(
+            !actions.iter().any(|a| matches!(a, Action::NotifyPuasa(_))),
+            "{actions:?}"
+        );
+        // Toast imsak generik tetap jalan seperti biasa.
+        assert!(actions.contains(&Action::NotifyImsak), "{actions:?}");
+    }
+
+    #[test]
+    fn puasa_tanpa_jenis_aktif_tidak_toast() {
+        let mut s = settings_dengan_jadwal();
+        s.puasa_sunnah.clear();
+        let mut state = EngineState::new();
+        let date = (2026, 10, 15); // Kamis
+        let times = day_times(&s, NaiveDate::from_ymd_opt(2026, 10, 15).unwrap()).unwrap();
+        let now = fake_now(
+            s.timezone(),
+            date,
+            (
+                times.imsak.hour(),
+                times.imsak.minute(),
+                times.imsak.second(),
+            ),
+        );
+        let actions = tick(&mut state, &s, now);
+        assert!(
+            !actions.iter().any(|a| matches!(a, Action::NotifyPuasa(_))),
+            "{actions:?}"
+        );
+        assert!(actions.contains(&Action::NotifyImsak), "{actions:?}");
+    }
+
+    #[test]
+    fn puasa_malam_toast_30_menit_setelah_maghrib() {
+        // 25 Okt 2026 (Ahad) malam — besoknya Senin 26 Okt = 15 Jumadil
+        // Awal: dua puasa sekaligus. Toast persiapan nyala tepat di jendela
+        // Maghrib + 30 menit, tidak dobel di tick berikutnya.
+        let s = settings_dengan_jadwal();
+        assert!(s.puasa_sunnah_notif_malam);
+        let mut state = EngineState::new();
+        let date = (2026, 10, 25);
+        let times = day_times(&s, NaiveDate::from_ymd_opt(2026, 10, 25).unwrap()).unwrap();
+        let target = times.maghrib + Duration::minutes(30);
+        let now = fake_now(
+            s.timezone(),
+            date,
+            (target.hour(), target.minute(), target.second()),
+        );
+        let actions = tick(&mut state, &s, now);
+        assert_eq!(
+            actions,
+            vec![Action::NotifyPuasaBesok(vec![
+                "puasa_senin",
+                "puasa_ayyamul_bidh"
+            ])],
+            "{actions:?}"
+        );
+        // Tick berikutnya tidak dobel.
+        let actions = tick(&mut state, &s, now + Duration::seconds(1));
+        assert!(actions.is_empty(), "{actions:?}");
+    }
+
+    #[test]
+    fn puasa_malam_toast_mati_lewat_setting() {
+        let mut s = settings_dengan_jadwal();
+        s.puasa_sunnah_notif_malam = false;
+        let mut state = EngineState::new();
+        let date = (2026, 10, 25);
+        let times = day_times(&s, NaiveDate::from_ymd_opt(2026, 10, 25).unwrap()).unwrap();
+        let target = times.maghrib + Duration::minutes(30);
+        let now = fake_now(
+            s.timezone(),
+            date,
+            (target.hour(), target.minute(), target.second()),
+        );
+        let actions = tick(&mut state, &s, now);
+        assert!(actions.is_empty(), "{actions:?}");
+    }
+
+    #[test]
+    fn puasa_malam_sebelum_jendela_waktu_diam() {
+        // Tick sebelum Maghrib + 30 menit tidak boleh memicu toast malam.
+        let s = settings_dengan_jadwal();
+        let mut state = EngineState::new();
+        let date = (2026, 10, 25);
+        let times = day_times(&s, NaiveDate::from_ymd_opt(2026, 10, 25).unwrap()).unwrap();
+        let target = times.maghrib + Duration::minutes(29);
+        let now = fake_now(
+            s.timezone(),
+            date,
+            (target.hour(), target.minute(), target.second()),
+        );
+        let actions = tick(&mut state, &s, now);
+        assert!(
+            !actions
+                .iter()
+                .any(|a| matches!(a, Action::NotifyPuasaBesok(_))),
+            "{actions:?}"
+        );
     }
 }

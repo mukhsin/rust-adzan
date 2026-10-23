@@ -11,8 +11,15 @@ use chrono_tz::Tz;
 use dioxus::prelude::*;
 
 /// Label (hari, tanggal masehi, tanggal hijri) untuk kartu tiket — dipakai
-/// widget dan layar Harian.
-pub fn tanggal_labels(lang: Language, now: &DateTime<Tz>) -> (String, String, String) {
+/// widget dan layar Harian. Hari & tanggal masehi mengikuti jam sekarang;
+/// tanggal hijri memakai tanggal efektif hasil rollover Maghrib
+/// (`prayer::tanggal_efektif_hijriah`) — setelah Maghrib, hari hijriah
+/// sudah milik besok.
+pub fn tanggal_labels(
+    lang: Language,
+    now: &DateTime<Tz>,
+    tanggal_hijri: chrono::NaiveDate,
+) -> (String, String, String) {
     use crate::i18n::{day_name, month_name};
     use chrono::Datelike as _;
     (
@@ -23,7 +30,7 @@ pub fn tanggal_labels(lang: Language, now: &DateTime<Tz>) -> (String, String, St
             month_name(lang, (now.month() - 1) as usize),
             now.year()
         ),
-        crate::hijri::format(lang, now.date_naive()),
+        crate::hijri::format(lang, tanggal_hijri),
     )
 }
 
@@ -37,6 +44,7 @@ pub fn Ticket(
     tanggal: String,
     tanggal_hijri: String,
     ramadan_day: Option<u32>,
+    puasa: Option<String>,
 ) -> Element {
     // Sholat berikutnya menentukan sorotan amber di papan jadwal.
     let (next_kind, _target) = prayer::next_prayer(&times, now);
@@ -53,6 +61,7 @@ pub fn Ticket(
                 tanggal: tanggal,
                 tanggal_hijri: tanggal_hijri,
                 ramadan_day: ramadan_day,
+                puasa: puasa,
             }
 
             div { class: "shrink-0 flex flex-col items-center justify-between py-16",

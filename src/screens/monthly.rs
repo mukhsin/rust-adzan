@@ -6,8 +6,8 @@
 //! papan kanan lebih tinggi total (items-start), bukan dipaksa sama tinggi
 //! seperti mockup yang membuat baris kanan lebih pendek.
 
+use crate::components::pemilih_bulan::PemilihBulan;
 use crate::components::ui::icons;
-use crate::components::ui::tooltip::{PosisiTooltip, Tooltip};
 use crate::i18n::{month_name, tr};
 use crate::prayer;
 use crate::state;
@@ -40,12 +40,6 @@ pub fn MonthlyView() -> Element {
         .city
         .clone()
         .unwrap_or_else(|| "Manual".to_string());
-    let bulan_label = format!(
-        "{} {} · {}",
-        month_name(lang, (month - 1) as usize),
-        year,
-        kota
-    );
 
     // Jadwal seluruh hari di bulan tampil — dihitung tiap render; tanpa tick
     // 1 detik, jadi hanya berjalan saat ganti bulan / settings.
@@ -82,31 +76,16 @@ pub fn MonthlyView() -> Element {
     rsx! {
         div { class: "flex-1 p-4 flex flex-col gap-[14px] overflow-y-auto",
 
-            // Kepala bulan: navigasi + judul + penanda hari ini.
+            // Kepala bulan: pemilih bulan & tahun (droplist) + penanda
+            // hari ini + unduh.
             div { class: "flex items-center gap-4 px-1 py-1",
                 div { class: "flex items-center gap-3.5",
-                    Tooltip { label: tr(lang, "prev_month").to_string(), posisi: PosisiTooltip::Bawah,
-                        button {
-                            class: "p-1 -m-1 rounded-md text-ink-2 hover:text-ink transition-colors cursor-pointer",
-                            onclick: move |_| {
-                                let (y, m) = bulan();
-                                bulan.set(if m == 1 { (y - 1, 12) } else { (y, m - 1) });
-                            },
-                            icons::IconChevronLeft { class: "w-5 h-5" }
-                        }
+                    PemilihBulan { year: year, month: month, on_change: move |(y, m)| bulan.set((y, m)) }
+                    span { class: "text-[13px] font-bold text-ink-3",
+                        "·"
                     }
-                    span { class: "text-[21px] font-bold tracking-wide uppercase text-ink",
-                        "{bulan_label}"
-                    }
-                    Tooltip { label: tr(lang, "next_month").to_string(), posisi: PosisiTooltip::Bawah,
-                        button {
-                            class: "p-1 -m-1 rounded-md text-ink-2 hover:text-ink transition-colors cursor-pointer",
-                            onclick: move |_| {
-                                let (y, m) = bulan();
-                                bulan.set(if m == 12 { (y + 1, 1) } else { (y, m + 1) });
-                            },
-                            icons::IconChevronRight { class: "w-5 h-5" }
-                        }
+                    span { class: "text-[13px] font-bold text-ink-3 uppercase",
+                        "{kota}"
                     }
                 }
                 div { class: "flex-1" }

@@ -66,6 +66,19 @@ pub enum Language {
     En,
 }
 
+/// Tampilan tanda waqf (penanda berhenti baca, mis. ۙ ۚ ۛ) di layar
+/// Al-Qur'an.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub enum QuranWaqf {
+    /// Dirender sama seperti teks ayat (bawaan).
+    #[default]
+    Tampil,
+    /// Dirender redup (warna samar) agar tidak menonjol.
+    Redup,
+    /// Tidak dirender sama sekali.
+    Sembunyi,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Settings {
@@ -109,6 +122,20 @@ pub struct Settings {
     pub terbit_offset: i32,
     /// Toast saat masuk waktu imsak.
     pub imsak_notif: bool,
+    /// Jenis puasa sunnah yang diikutkan — sumber pil di widget/Harian &
+    /// toast pengingat (lihat `puasa::daftar_hari_ini`).
+    pub puasa_sunnah: Vec<crate::puasa::PuasaSunnahKind>,
+    /// Toast pengingat puasa sunnah saat imsak di hari puasa.
+    pub puasa_sunnah_notif: bool,
+    /// Toast persiapan puasa BESOK — 30 menit setelah Maghrib.
+    pub puasa_sunnah_notif_malam: bool,
+    /// Tampilkan terjemahan Kemenag di layar Al-Qur'an.
+    pub quran_terjemahan: bool,
+    /// Gaya baca Al-Qur'an: `false` = per ayat (kartu), `true` = mushaf
+    /// (aliran menerus, selalu tanpa terjemahan).
+    pub quran_mushaf: bool,
+    /// Tampilan tanda waqf (penanda berhenti baca) di layar Al-Qur'an.
+    pub quran_waqf: QuranWaqf,
     /// Periksa rilis baru via GitHub Releases saat startup & tiap 12 jam.
     pub update_check: bool,
 }
@@ -137,6 +164,12 @@ impl Default for Settings {
             prayer_offsets: HashMap::new(),
             terbit_offset: 0,
             imsak_notif: true,
+            puasa_sunnah: crate::puasa::SEMUA.to_vec(),
+            puasa_sunnah_notif: true,
+            puasa_sunnah_notif_malam: true,
+            quran_terjemahan: true,
+            quran_mushaf: false,
+            quran_waqf: QuranWaqf::Tampil,
             update_check: true,
         }
     }
@@ -262,6 +295,13 @@ mod tests {
         assert!(back.imsak_notif);
         assert!(back.update_check);
         assert!(back.prayer_offsets.is_empty());
+        // Fitur v1.5: config lama tanpa field baru ikut default masuk akal.
+        assert_eq!(back.puasa_sunnah.len(), crate::puasa::SEMUA.len());
+        assert!(back.puasa_sunnah_notif);
+        assert!(back.puasa_sunnah_notif_malam);
+        assert!(back.quran_terjemahan);
+        assert!(!back.quran_mushaf);
+        assert_eq!(back.quran_waqf, QuranWaqf::Tampil);
     }
 
     #[test]

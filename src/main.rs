@@ -14,6 +14,7 @@ mod layouts;
 mod logger;
 mod notify;
 mod prayer;
+mod puasa;
 mod qibla;
 mod quran;
 mod scheduler;

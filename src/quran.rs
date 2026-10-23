@@ -58,6 +58,40 @@ pub fn total_ayat() -> usize {
     surah_list().iter().map(|s| s.ayat.len()).sum()
 }
 
+/// `true` bila `c` adalah tanda waqf (penanda berhenti baca) — range
+/// annotasi Al-Qur'an U+06D6–06DC (ۙ ۚ ۛ dst., kecil melayang di atas
+/// teks). Tanda struktural sengaja di luar: ۞ (pembagi juz) dan ۩
+/// (sujud) bukan penanda berhenti dan tetap tampil apa pun settingnya.
+pub fn tanda_waqf(c: char) -> bool {
+    matches!(c as u32, 0x06D6..=0x06DC)
+}
+
+/// Pecah teks ayat menjadi segmen berurutan `(potongan, tanda_waqf)` —
+/// tanda waqf terkumpul di segmen sendiri agar UI bisa men-style
+/// (meredupkan) atau menyembunyikannya. Zero-copy: tiap potongan meminjam
+/// slice dari `teks`. Tanda selalu menempel di akhir kata (bukti: tidak
+/// pernah menggabungkan huruf), jadi pemecahan ini tidak mengubah
+/// perenderan sambungan huruf sama sekali.
+pub fn segmen_teks(teks: &str) -> Vec<(&str, bool)> {
+    let mut segmen = Vec::new();
+    let mut mulai = 0usize;
+    let mut tanda_sebelumnya = None::<bool>;
+    for (i, c) in teks.char_indices() {
+        let tanda = tanda_waqf(c);
+        if tanda_sebelumnya != Some(tanda) {
+            if let Some(sebelumnya) = tanda_sebelumnya {
+                segmen.push((&teks[mulai..i], sebelumnya));
+            }
+            mulai = i;
+            tanda_sebelumnya = Some(tanda);
+        }
+    }
+    if let Some(sebelumnya) = tanda_sebelumnya {
+        segmen.push((&teks[mulai..], sebelumnya));
+    }
+    segmen
+}
+
 /// Atribusi sumber & lisensi data (dipakai bila Tentang menampilkan
 /// atribusi lengkap; untuk kini Tentang memakai ringkasannya).
 #[allow(dead_code)]
@@ -101,7 +135,7 @@ mod tests {
                 "surah {}",
                 s.nomor
             );
-            assert_eq!(s.ayat.is_empty(), false, "surah {} tanpa ayat", s.nomor);
+            assert!(!s.ayat.is_empty(), "surah {} tanpa ayat", s.nomor);
             for (i, (arab, terjemahan)) in s.ayat.iter().enumerate() {
                 assert!(
                     !arab.is_empty(),
@@ -125,6 +159,36 @@ mod tests {
         assert!(baca(115).is_none());
         assert!(baca(1).is_some());
         assert!(baca(114).is_some());
+    }
+
+    #[test]
+    fn segmen_teks_pisahkan_tanda_waqf() {
+        // Ayat 1 Al-Fatihah — tanda waqf ۙ menempel di ujung kata.
+        let ayat = "اَلْحَمْدُ لِلّٰهِ رَبِّ الْعٰلَمِيْنَۙ";
+        let seg = segmen_teks(ayat);
+        assert_eq!(seg.len(), 2, "{seg:?}");
+        assert_eq!(seg[0], ("اَلْحَمْدُ لِلّٰهِ رَبِّ الْعٰلَمِيْنَ", false));
+        assert_eq!(seg[1], ("ۙ", true));
+
+        // Tanda di tengah ayat (dengan spasi) tetap terpisah; teks utuh.
+        let seg = segmen_teks("لَا رَيْبَ ۛ فِيْهِ");
+        assert_eq!(seg.len(), 3, "{seg:?}");
+        assert!(seg.iter().all(|(teks, _)| !teks.is_empty()));
+        assert_eq!(seg[1], ("ۛ", true));
+        let gabung: String = seg.iter().map(|(teks, _)| *teks).collect();
+        assert_eq!(gabung, "لَا رَيْبَ ۛ فِيْهِ");
+
+        // Tanpa tanda = satu segmen; string kosong = tanpa segmen.
+        assert_eq!(segmen_teks("بِسْمِ ٱللَّهِ"), vec![("بِسْمِ ٱللَّهِ", false)]);
+        assert!(segmen_teks("").is_empty());
+    }
+
+    #[test]
+    fn tanda_waqf_hanya_range_annotasi() {
+        assert!(tanda_waqf('ۙ') && tanda_waqf('ۚ') && tanda_waqf('ۛ'));
+        // Tanda struktural bukan waqf.
+        assert!(!tanda_waqf('۞') && !tanda_waqf('۩'));
+        assert!(!tanda_waqf('ب') && !tanda_waqf('َ'));
     }
 
     #[test]

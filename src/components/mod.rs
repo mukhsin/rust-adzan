@@ -5,9 +5,11 @@
 //! - [`ticket`] — kartu tiket (komposisi countdown + papan jadwal).
 //! - [`countdown`] — pane kiri tiket (identitas + hitung mundur + tanggal).
 //! - [`prayer_table`] — papan jadwal hari ini + lonceng adzan per baris.
+//! - [`pemilih_bulan`] — sepasang droplist bulan & tahun (Kalender/Bulanan).
 //! - [`ui`] — komponen atomik (tombol, modal, sakelar, …).
 
 pub mod countdown;
+pub mod pemilih_bulan;
 pub mod prayer_table;
 pub mod ticket;
 pub mod title_bar;

@@ -2,16 +2,18 @@
 //! "Kalender" design system pen:
 //! - tiap sel: tanggal hijriah (angka Arab, kanan-atas), tanggal masehi
 //!   besar (tengah), dan baris weton Jawa — Tgl Jawa · Pasaran · Neptu;
-//! - Ahad disorot merah (`ahad`), Jum'at hijau (`jumat`), hari ini amber;
+//! - Ahad disorot merah (`ahad`), Jum'at hijau (`jumat`), hari ini amber,
+//!   hari puasa sunnah tint amber redup (`bg-amber/10`), dan hari puasa
+//!   wajib bulan Ramadhan tint ungu (`bg-ramadan/10`);
 //! - kepala kolom dwibahasa: Latin + Arab.
 //!
 //! Kalender Jawa mengikuti kalender hijriah (Tgl Jawa = tanggal hijriah),
 //! dan Neptu = neptu hari + neptu pasaran.
 
+use crate::components::pemilih_bulan::PemilihBulan;
 use crate::components::ui::icons;
-use crate::components::ui::tooltip::{PosisiTooltip, Tooltip};
 use crate::hijri;
-use crate::i18n::{day_name, hijri_month_name, month_name, tr};
+use crate::i18n::{day_name, hijri_month_name, tr};
 use crate::prayer;
 use crate::state;
 use chrono::{Datelike, NaiveDate};
@@ -64,26 +66,27 @@ pub fn CalendarView() -> Element {
         .city
         .clone()
         .unwrap_or_else(|| "Manual".to_string());
-    let bulan_label = format!(
-        "{} {} · {}",
-        month_name(lang, (month - 1) as usize),
-        year,
-        kota
-    );
 
     // Rentang hijriah GRID tampil (bukan cuma bulan): sel pertama bisa
-    // beberapa hari bulan sebelumnya — "16 Rabiul Akhir – 20 Jumadil Awal H".
+    // beberapa hari bulan sebelumnya. Ditampilkan dua baris, masing-masing
+    // tanggal lengkap dengan tahunnya:
+    //   16 Rabiul Akhir 1448 H
+    //   20 Jumadil Awal 1448 H
     let first = NaiveDate::from_ymd_opt(year, month, 1).expect("tanggal valid");
     let last_day = days_in_month(year, month);
     let last = NaiveDate::from_ymd_opt(year, month, last_day).expect("tanggal valid");
     let lead = first.weekday().num_days_from_sunday();
     let grid_first = first - chrono::Duration::days(lead as i64);
-    let (_h1, m1, d1) = hijri::to_hijri(grid_first);
+    let (h1, m1, d1) = hijri::to_hijri(grid_first);
     let (h2, m2, d2) = hijri::to_hijri(last);
-    let rentang = format!(
-        "{} {} – {} {} {} H",
+    let rentang_atas = format!(
+        "{} {} {} H",
         d1,
         hijri_month_name(lang, (m1 - 1) as usize),
+        h1
+    );
+    let rentang_bawah = format!(
+        "{} {} {} H",
         d2,
         hijri_month_name(lang, (m2 - 1) as usize),
         h2
@@ -97,36 +100,26 @@ pub fn CalendarView() -> Element {
     rsx! {
         div { class: "flex-1 p-4 flex flex-col gap-[14px] overflow-y-auto",
 
-            // Kepala kalender: navigasi + judul + rentang hijriah + hari ini.
+            // Kepala kalender: pemilih bulan & tahun (droplist) + rentang
+            // hijriah + hari ini + unduh.
             div { class: "flex items-center gap-4 px-1 py-1",
                 div { class: "flex items-center gap-3.5",
-                    Tooltip { label: tr(lang, "prev_month").to_string(), posisi: PosisiTooltip::Bawah,
-                        button {
-                            class: "p-1 -m-1 rounded-md text-ink-2 hover:text-ink transition-colors cursor-pointer",
-                            onclick: move |_| {
-                                let (y, m) = bulan();
-                                bulan.set(if m == 1 { (y - 1, 12) } else { (y, m - 1) });
-                            },
-                            icons::IconChevronLeft { class: "w-5 h-5" }
-                        }
+                    PemilihBulan { year: year, month: month, on_change: move |(y, m)| bulan.set((y, m)) }
+                    span { class: "text-[13px] font-bold text-ink-3",
+                        "·"
                     }
-                    span { class: "text-[21px] font-bold tracking-wide uppercase text-ink",
-                        "{bulan_label}"
-                    }
-                    Tooltip { label: tr(lang, "next_month").to_string(), posisi: PosisiTooltip::Bawah,
-                        button {
-                            class: "p-1 -m-1 rounded-md text-ink-2 hover:text-ink transition-colors cursor-pointer",
-                            onclick: move |_| {
-                                let (y, m) = bulan();
-                                bulan.set(if m == 12 { (y + 1, 1) } else { (y, m + 1) });
-                            },
-                            icons::IconChevronRight { class: "w-5 h-5" }
-                        }
+                    span { class: "text-[13px] font-bold text-ink-3 uppercase",
+                        "{kota}"
                     }
                 }
                 div { class: "flex-1" }
-                span { class: "font-mono text-[10.5px] tracking-[0.08em] uppercase text-ink-3",
-                    "{rentang}"
+                div { class: "flex flex-col items-end gap-0.5",
+                    span { class: "font-mono text-[10.5px] tracking-[0.08em] uppercase text-ink-3",
+                        "{rentang_atas}"
+                    }
+                    span { class: "font-mono text-[10.5px] tracking-[0.08em] uppercase text-ink-3",
+                        "{rentang_bawah}"
+                    }
                 }
                 if bulan_tampil {
                     div { class: "flex items-center gap-2 bg-amber rounded-full px-3 py-1.5",
@@ -182,7 +175,7 @@ pub fn CalendarView() -> Element {
                                     span { class: "font-mono text-[9.5px] font-semibold uppercase {warna}",
                                         "{latin}"
                                     }
-                                    span { class: "font-[Noto_Naskh_Arabic] text-[11px] text-ink-3",
+                                    span { class: "font-arab text-[11px] text-ink-3",
                                         dir: "rtl",
                                         "{arab}"
                                     }
@@ -202,10 +195,19 @@ pub fn CalendarView() -> Element {
                                 let is_today = date == today;
                                 let weekday = date.weekday().num_days_from_sunday() as usize;
                                 let (h_y, h_m, h_d) = hijri::to_hijri(date);
-                                // Penanda tanggal penting Islam (1 Ramadhan,
-                                // Idul Fitri, dst.) dari tanggal hijriah sel.
-                                let acara = crate::dates::by_hijri(h_m, h_d)
-                                    .map(|kind| tr(lang, kind.key()));
+                                // Sorotan puasa sunnah: sel diberi tint amber
+                                // bila tanggal itu ada puasa sunnah yang
+                                // diikutkan (mengikuti settings).
+                                let puasa_sunnah = !crate::puasa::daftar_hari_ini(
+                                    date,
+                                    &settings.puasa_sunnah,
+                                )
+                                .is_empty();
+                                // Puasa wajib bulan Ramadhan: tint ungu —
+                                // beda warna dari tint amber puasa sunnah
+                                // (saling eksklusif: sunnah kosong saat
+                                // Ramadhan).
+                                let ramadan = h_m == 9;
                                 let _ = h_y;
                                 let weton_tgl = h_d;
                                 let pasaran = PASARAN[pasaran_index(date)];
@@ -245,34 +247,27 @@ pub fn CalendarView() -> Element {
                                 }
                                 if is_today {
                                     cell_class.push_str(" rounded-md bg-amber");
+                                } else if ramadan {
+                                    // Hari puasa wajib Ramadhan: tint ungu.
+                                    cell_class.push_str(" bg-ramadan/10");
+                                } else if puasa_sunnah {
+                                    // Hari puasa sunnah: tint amber redup
+                                    // (today tetap solid amber, prioritas).
+                                    cell_class.push_str(" bg-amber/10");
                                 }
                                 let hijriah = arabic_numerals(h_d);
                                 let pasaran_nama = pasaran.to_uppercase();
-                                // Label peristiwa: amber saat dalam bulan
-                                // (dibaca), redup saat out-month. Pakai
-                                // text-amber (bukan amber-ink) agar terbaca
-                                // di tema gelap.
-                                let acara_class = if in_month {
-                                    "text-[9px] font-bold uppercase tracking-wide text-amber truncate max-w-full"
-                                } else {
-                                    "text-[9px] font-bold uppercase tracking-wide text-board-dim truncate max-w-full"
-                                };
 
                                 rsx! {
                                     div { class: "{cell_class}",
                                         div { class: "h-5 text-right",
-                                            span { class: "font-[Noto_Naskh_Arabic] text-[11.5px] text-ink-3",
+                                            span { class: "font-arab text-[11.5px] text-ink-3",
                                                 dir: "rtl",
                                                 "{hijriah}"
                                             }
                                         }
                                         div { class: "flex-1 flex flex-col items-center justify-center gap-[3px] min-w-0",
                                             span { class: "{masehi_class}", "{date.day()}" }
-                                            if let Some(nama) = &acara {
-                                                Tooltip { label: (*nama).to_string(), posisi: PosisiTooltip::Atas,
-                                                    span { class: "{acara_class}", "{nama}" }
-                                                }
-                                            }
                                         }
                                         div { class: "h-[13px] flex items-center justify-between",
                                             span { class: "{weton_class}", "{weton_tgl}" }
@@ -308,11 +303,15 @@ pub fn CalendarView() -> Element {
                     }
                 }
                 div { class: "flex items-center gap-[7px]",
-                    span { class: "font-mono text-[9.5px] font-bold uppercase text-amber",
-                        "1 Ram"
-                    }
+                    span { class: "w-[10px] h-[10px] rounded-[3px] bg-amber/10 border border-amber/50" }
                     span { class: "font-mono text-[9.5px] font-semibold uppercase text-ink-2",
-                        "{tr(lang, \"sec_dates\")}"
+                        "{tr(lang, \"sec_puasa\")}"
+                    }
+                }
+                div { class: "flex items-center gap-[7px]",
+                    span { class: "w-[10px] h-[10px] rounded-[3px] bg-ramadan/15 border border-ramadan/50" }
+                    span { class: "font-mono text-[9.5px] font-semibold uppercase text-ink-2",
+                        "{hijri_month_name(lang, 8)}"
                     }
                 }
             }

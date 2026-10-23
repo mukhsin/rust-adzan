@@ -56,6 +56,7 @@ fn svg_bulanan_dengan(settings: &Settings, tahun: i32, bulan: u32) -> String {
 
     let lebar = MARGIN * 2.0 + LEBAR_HARI + LEBAR_TANGGAL + 7.0 * LEBAR_JAM;
     let tinggi = Y_TABEL + (jumlah_hari as f32 + 1.0) * TINGGI_BARIS + FOOTER;
+    let peride = format!("{} {}", i18n::month_name(lang, bulan as usize - 1), tahun);
 
     let mut svg = format!(
         "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"{lebar}\" height=\"{tinggi}\" \
@@ -69,7 +70,6 @@ fn svg_bulanan_dengan(settings: &Settings, tahun: i32, bulan: u32) -> String {
          fill=\"{WARNA_REDUP}\">{info}</text>",
         x = MARGIN,
         judul = escape_xml(crate::settings::APP_NAME),
-        peride = format!("{} {}", i18n::month_name(lang, bulan as usize - 1), tahun),
         info = escape_xml(&info_line(settings)),
     );
 
@@ -224,11 +224,13 @@ fn nama_metode_ringkas(m: CalcMethod) -> &'static str {
 
 /// Rasterisasi SVG menjadi PNG pada `skala` (mis. 2.0 = resolusi 2×).
 fn render_png(svg: &str, skala: f32) -> Result<HasilRender, String> {
-    let mut opt = resvg::usvg::Options::default();
-    opt.font_family = FONT.to_string();
     let mut fontdb = resvg::usvg::fontdb::Database::new();
     fontdb.load_system_fonts();
-    opt.fontdb = std::sync::Arc::new(fontdb);
+    let opt = resvg::usvg::Options {
+        font_family: FONT.to_string(),
+        fontdb: std::sync::Arc::new(fontdb),
+        ..Default::default()
+    };
 
     let tree =
         resvg::usvg::Tree::from_str(svg, &opt).map_err(|e| format!("SVG tidak valid: {e}"))?;
@@ -315,8 +317,9 @@ const WARNA_HARI_INI_TEKS: &str = "#92400e";
 
 /// SVG kalender satu bulan ala layar Kalender: kolom Ahad-first, tiap sel
 /// memuat angka hijriah (Arab-Indic, kanan-atas), tanggal masehi besar di
-/// tengah, label tanggal penting, dan baris weton (tgl Jawa · pasaran ·
-/// neptu). Hari ini disorot amber; Ahad merah, Jum'at hijau.
+/// tengah, dan baris weton (tgl Jawa · pasaran · neptu). Hari ini disorot
+/// amber; Ahad merah, Jum'at hijau; hari puasa sunnah tint amber; tabel
+/// dikelilingi border luar selain garis antar sel.
 pub fn svg_kalender(settings: &Settings, tahun: i32, bulan: u32) -> String {
     let lang = settings.language;
     let today = prayer::now_in_tz(settings).date_naive();
@@ -352,6 +355,7 @@ pub fn svg_kalender(settings: &Settings, tahun: i32, bulan: u32) -> String {
         .city
         .clone()
         .unwrap_or_else(|| format!("{:.4}, {:.4}", settings.lat, settings.lng));
+    let periode = format!("{} {}", i18n::month_name(lang, bulan as usize - 1), tahun);
 
     let mut svg = format!(
         "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"{lebar}\" height=\"{tinggi}\" \
@@ -365,7 +369,6 @@ pub fn svg_kalender(settings: &Settings, tahun: i32, bulan: u32) -> String {
          fill=\"{WARNA_REDUP}\">{rentang} · {kota}</text>",
         x = MARGIN,
         judul = escape_xml(crate::settings::APP_NAME),
-        periode = format!("{} {}", i18n::month_name(lang, bulan as usize - 1), tahun),
         rentang = escape_xml(&rentang),
         kota = escape_xml(&kota),
     );
@@ -405,11 +408,34 @@ pub fn svg_kalender(settings: &Settings, tahun: i32, bulan: u32) -> String {
         let in_month = date.month() == bulan && date.year() == tahun;
         let is_today = date == today;
         let weekday = date.weekday().num_days_from_sunday(); // 0 = Ahad
+        let (_, h_m, h_d) = crate::hijri::to_hijri(date);
 
         if is_today {
             svg += &format!(
                 "<rect x=\"{}\" y=\"{}\" width=\"{}\" height=\"{}\" rx=\"6\" \
                  fill=\"{WARNA_HARI_INI}\"/>",
+                x0 + 2.0,
+                y0 + 2.0,
+                SEL_LEBAR - 4.0,
+                SEL_TINGGI - 4.0
+            );
+        } else if h_m == 9 {
+            // Puasa wajib bulan Ramadhan: tint ungu muda — beda warna dari
+            // tint amber puasa sunnah (layar: bg-ramadan/10).
+            svg += &format!(
+                "<rect x=\"{}\" y=\"{}\" width=\"{}\" height=\"{}\" rx=\"6\" \
+                 fill=\"#ddd6fe\"/>",
+                x0 + 2.0,
+                y0 + 2.0,
+                SEL_LEBAR - 4.0,
+                SEL_TINGGI - 4.0
+            );
+        } else if !crate::puasa::daftar_hari_ini(date, &settings.puasa_sunnah).is_empty() {
+            // Hari puasa sunnah: tint amber lembut (layar: bg-amber/10) —
+            // sel today tetap solid amber, prioritas.
+            svg += &format!(
+                "<rect x=\"{}\" y=\"{}\" width=\"{}\" height=\"{}\" rx=\"6\" \
+                 fill=\"{WARNA_HARI_INI}\" fill-opacity=\"0.45\"/>",
                 x0 + 2.0,
                 y0 + 2.0,
                 SEL_LEBAR - 4.0,
@@ -449,7 +475,6 @@ pub fn svg_kalender(settings: &Settings, tahun: i32, bulan: u32) -> String {
         };
 
         // Angka hijriah kanan-atas (Arab-Indic).
-        let (_, _, h_d) = crate::hijri::to_hijri(date);
         svg += &teks_rata(
             x0 + SEL_LEBAR - 10.0,
             y0 + 22.0,
@@ -469,24 +494,6 @@ pub fn svg_kalender(settings: &Settings, tahun: i32, bulan: u32) -> String {
             warna_masehi,
             "middle",
         );
-        // Label tanggal penting (hanya dalam bulan).
-        if in_month {
-            let (h_m2, h_d2) = {
-                let (_, m, d) = crate::hijri::to_hijri(date);
-                (m, d)
-            };
-            if let Some(acara) = crate::dates::by_hijri(h_m2, h_d2) {
-                svg += &teks_rata(
-                    x0 + SEL_LEBAR / 2.0,
-                    y0 + 92.0,
-                    &tr(lang, acara.key()).to_uppercase(),
-                    9.5,
-                    "700",
-                    WARNA_HARI_INI_TEKS,
-                    "middle",
-                );
-            }
-        }
         // Baris weton: tgl Jawa · pasaran · neptu.
         let (weton_tgl, pasaran, neptu) = crate::screens::calendar::info_weton(date);
         let warna_weton = if is_today {
@@ -529,12 +536,31 @@ pub fn svg_kalender(settings: &Settings, tahun: i32, bulan: u32) -> String {
         );
     }
 
-    // Keterangan: hari ini, Ahad, Jum'at.
+    // Border luar tabel kalender — garis antar sel hanya internal;
+    // perimeter perlu satu rect penutup agar tabel terbungkus penuh.
+    svg += &format!(
+        "<rect x=\"{MARGIN}\" y=\"{Y_GRID}\" width=\"{}\" height=\"{}\" \
+         fill=\"none\" stroke=\"{WARNA_GARIS}\" stroke-width=\"1\"/>",
+        7.0 * SEL_LEBAR,
+        weeks as f32 * SEL_TINGGI
+    );
+
+    // Keterangan: hari ini, Ahad, Jum'at, puasa sunnah, Ramadhan.
     let mut keterangan_x = MARGIN;
     let legenda = [
         (WARNA_HARI_INI, tr(lang, "today").to_uppercase()),
         (WARNA_AHAD, "AHAD".to_string()),
         (WARNA_JUMAT, i18n::day_name(lang, 4).to_uppercase()),
+        (
+            // Amber-200 — lebih pekat dari tint sel agar swatch terbaca.
+            "#fde68a",
+            tr(lang, "sec_puasa").to_uppercase(),
+        ),
+        (
+            // Violet-300 — swatch tint Ramadhan.
+            "#c4b5fd",
+            i18n::hijri_month_name(lang, 8).to_uppercase(),
+        ),
     ];
     for (warna, label) in legenda {
         svg += &format!(

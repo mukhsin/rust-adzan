@@ -5,6 +5,10 @@
 default:
     @just --list
 
+# ══════════════════════════════════════════════
+# DEVELOPMENT
+# ══════════════════════════════════════════════
+
 # jalankan aplikasi mode dev dengan hot-reload (butuh dioxus-cli)
 dev: css
     dx serve
@@ -21,9 +25,45 @@ check: css
 build: css
     cargo build
 
-# build versi release (opt-level "s" + LTO)
-release: css
-    cargo build --release
+# buka dokumentasi API project di browser
+doc: css
+    cargo doc --no-deps --open
+
+# bersihkan hasil build
+clean:
+    cargo clean
+
+# ══════════════════════════════════════════════
+# VERIFIKASI KUALITAS
+# ══════════════════════════════════════════════
+
+# jalankan semua unit test (prayer, scheduler, dll)
+test: css
+    cargo test
+
+# jalankan satu test berdasarkan nama, contoh: just test-one next_prayer
+test-one name: css
+    cargo test {{name}}
+
+# format semua kode
+fmt:
+    cargo fmt
+
+# cek format tanpa mengubah file (untuk CI/verify)
+fmt-check:
+    cargo fmt --check
+
+# linter clippy
+clippy: css
+    cargo clippy --all-targets
+
+# fmt-check + clippy + test sekaligus (simulasi CI sebelum commit/push)
+verify: fmt-check clippy test
+    @echo "Semua cek lolos, aman untuk commit."
+
+# ══════════════════════════════════════════════
+# ASET
+# ══════════════════════════════════════════════
 
 # regenerate assets/tailwind.css bila basah/hilang (hasil generate TIDAK
 # di-track git; regen butuh bunx). Skrip sendiri yang memutuskan skip.
@@ -34,19 +74,13 @@ css:
 icon:
     cargo run --bin gen-icon
 
-# cek installer terbaru di shared folder kantor (butuh akses \\svrbtch-app-u01)
-check-share:
-    powershell -NoProfile -ExecutionPolicy Bypass -File tools/check-update-share.ps1
+# ══════════════════════════════════════════════
+# RILIS
+# ══════════════════════════════════════════════
 
-# salin installer dari dist/ ke shared folder kantor (butuh VPN kantor).
-# contoh: just publish-share 1.2.0
-publish-share version:
-    @test -f "dist/Jadwal Sholat {{version}} x64-setup.exe" \
-      || (echo "dist/Jadwal Sholat {{version}} x64-setup.exe tidak ada — jalankan 'just release-all {{version}}' atau 'just bundle' dulu."; exit 1)
-    @mkdir -p "//svrbtch-app-u01/SHARE APPLICATION/Jadwal Sholat/v{{version}}"
-    @cp -v "dist/Jadwal Sholat {{version}} x64-setup.exe" \
-      "//svrbtch-app-u01/SHARE APPLICATION/Jadwal Sholat/v{{version}}/"
-    @echo "Tersalin ke share: v{{version}}"
+# build versi release (opt-level "s" + LTO)
+release: css
+    cargo build --release
 
 # build installer NSIS ringan (WebView2 diunduh saat instalasi)
 bundle: css
@@ -77,49 +111,6 @@ set-version version:
     @sed -i 's/!define VERSION ".*"/!define VERSION "{{version}}"/' tools/installer.nsi
     @echo "Versi di-set ke {{version}} (Cargo.toml + installer.nsi)"
 
-# jalankan semua unit test (prayer, scheduler, dll)
-test: css
-    cargo test
-
-# jalankan satu test berdasarkan nama, contoh: just test-one next_prayer
-test-one name: css
-    cargo test {{name}}
-
-# format semua kode
-fmt:
-    cargo fmt
-
-# cek format tanpa mengubah file (untuk CI/verify)
-fmt-check:
-    cargo fmt --check
-
-# linter clippy
-clippy: css
-    cargo clippy --all-targets
-
-# fmt-check + clippy + test sekaligus (simulasi CI sebelum commit/push)
-verify: fmt-check clippy test
-    @echo "Semua cek lolos, aman untuk commit."
-
-# buka dokumentasi API project di browser
-doc: css
-    cargo doc --no-deps --open
-
-# bersihkan hasil build
-clean:
-    cargo clean
-
-# arsipkan installer ke dist/ lalu bersihkan seluruh target/ (hemat disk)
-prune:
-    mkdir -p dist
-    if ls target/nsis/*.exe >/dev/null 2>&1; then \
-        cp -v target/nsis/*.exe dist/; \
-        echo "Installer diarsipkan ke dist/"; \
-    else \
-        echo "Tidak ada installer di target/nsis, lewati arsip."; \
-    fi
-    cargo clean
-
 # rilis lengkap: bump versi, commit+push, installer, GitHub release, arsip ke dist/
 # contoh: just release-all 0.2.0   (opsional: notes=path file catatan rilis)
 release-all version notes="":
@@ -133,3 +124,32 @@ release-all version notes="":
     @git push
     @just dist
     @bash tools/release.sh {{version}} {{notes}}
+
+# arsipkan installer ke dist/ lalu bersihkan seluruh target/ (hemat disk)
+prune:
+    mkdir -p dist
+    if ls target/nsis/*.exe >/dev/null 2>&1; then \
+        cp -v target/nsis/*.exe dist/; \
+        echo "Installer diarsipkan ke dist/"; \
+    else \
+        echo "Tidak ada installer di target/nsis, lewati arsip."; \
+    fi
+    cargo clean
+
+# ══════════════════════════════════════════════
+# PUBLIKASI SHARE KANTOR
+# ══════════════════════════════════════════════
+
+# cek installer terbaru di shared folder kantor (butuh akses \\svrbtch-app-u01)
+check-share:
+    powershell -NoProfile -ExecutionPolicy Bypass -File tools/check-update-share.ps1
+
+# salin installer dari dist/ ke shared folder kantor (butuh VPN kantor).
+# contoh: just publish-share 1.2.0
+publish-share version:
+    @test -f "dist/Jadwal Sholat {{version}} x64-setup.exe" \
+      || (echo "dist/Jadwal Sholat {{version}} x64-setup.exe tidak ada — jalankan 'just release-all {{version}}' atau 'just bundle' dulu."; exit 1)
+    @mkdir -p "//svrbtch-app-u01/SHARE APPLICATION/Jadwal Sholat/v{{version}}"
+    @cp -v "dist/Jadwal Sholat {{version}} x64-setup.exe" \
+      "//svrbtch-app-u01/SHARE APPLICATION/Jadwal Sholat/v{{version}}/"
+    @echo "Tersalin ke share: v{{version}}"

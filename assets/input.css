@@ -37,9 +37,11 @@
   --c-sheet: #f4f1ec;
   --c-board: #fbf9f5;
   --c-on-ink: #f4f1ec;
-  /* Kalender: Ahad (merah) & Jum'at (hijau), teks redup papan. */
+  /* Kalender: Ahad (merah) & Jum'at (hijau), teks redup papan.
+     Ramadhan (ungu) = tint hari puasa wajib bulan Ramadhan. */
   --c-ahad: #b3492f;
   --c-jumat: #3f7d54;
+  --c-ramadan: #6f5bd0;
   --c-board-dim: #6e675a;
 }
 .dark {
@@ -57,6 +59,7 @@
   --c-on-ink: #17181c;
   --c-ahad: #e0917c;
   --c-jumat: #92c4a4;
+  --c-ramadan: #b6a6ee;
   --c-board-dim: #61666f;
 }
 @theme inline {
@@ -74,6 +77,7 @@
   --color-on-ink: var(--c-on-ink);
   --color-ahad: var(--c-ahad);
   --color-jumat: var(--c-jumat);
+  --color-ramadan: var(--c-ramadan);
   --color-board-dim: var(--c-board-dim);
 }
 

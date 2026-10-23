@@ -193,11 +193,6 @@ const PHRASES: &[(&str, &str, &str)] = &[
     ("sec_misc", "Lainnya", "Other"),
     // Kartu Waktu Lainnya (layar Harian)
     ("waktu_lainnya", "Waktu Lainnya", "Other Times"),
-    (
-        "waktu_lainnya_sub",
-        "waktu tambahan · {zona}",
-        "extra times · {zona}",
-    ),
     ("dhuha", "Dhuha", "Duha"),
     ("tengah_malam", "Tengah Malam", "Midnight"),
     ("sepertiga_malam", "Sepertiga Malam", "Last Third of Night"),
@@ -435,6 +430,105 @@ const PHRASES: &[(&str, &str, &str)] = &[
         "ramadan_badge",
         "🌙 Ramadhan · hari ke-{n}",
         "🌙 Ramadan · day {n}",
+    ),
+    // Puasa sunnah (settings, pil widget/Harian, toast pengingat)
+    ("sec_puasa", "Puasa Sunnah", "Sunnah Fasting"),
+    (
+        "f_puasa_notif",
+        "Notifikasi pengingat",
+        "Reminder notification",
+    ),
+    (
+        "hint_puasa_notif",
+        "toast saat imsak di hari puasa",
+        "toast at imsak on fasting days",
+    ),
+    (
+        "f_puasa_notif_malam",
+        "Notifikasi persiapan",
+        "Evening reminder",
+    ),
+    (
+        "hint_puasa_notif_malam",
+        "toast 30 menit setelah Maghrib — puasa besok",
+        "toast 30 minutes after Maghrib — tomorrow's fast",
+    ),
+    ("puasa_senin", "Puasa Senin", "Monday fast"),
+    ("puasa_kamis", "Puasa Kamis", "Thursday fast"),
+    (
+        "puasa_ayyamul_bidh",
+        "Puasa Ayyamul Bidh",
+        "White days fast",
+    ),
+    (
+        "hint_ayyamul_bidh",
+        "tanggal 13–15 tiap bulan hijriah",
+        "13th–15th of each Hijri month",
+    ),
+    ("puasa_syawal", "Puasa Syawal", "Shawwal fast"),
+    (
+        "hint_puasa_syawal",
+        "6 hari setelah Idul Fitri",
+        "6 days after Eid al-Fitr",
+    ),
+    ("puasa_penting", "Puasa hari penting", "Special-day fasts"),
+    (
+        "hint_puasa_penting",
+        "Tarwiyah, Arafah, Tasu'a, Asyura",
+        "Tarwiyah, Arafah, Tasu'a, Ashura",
+    ),
+    ("puasa_tarwiyah", "Puasa Tarwiyah", "Tarwiyah fast"),
+    ("puasa_arafah", "Puasa Arafah", "Arafah fast"),
+    ("puasa_tasua", "Puasa Tasu'a", "Tasu'a fast"),
+    ("puasa_asyura", "Puasa Asyura", "Ashura fast"),
+    (
+        "notif_puasa_title",
+        "Pengingat puasa sunnah",
+        "Sunnah fast reminder",
+    ),
+    (
+        "notif_puasa_body",
+        "Hari ini {daftar}. Selamat berpuasa! 🌙",
+        "Today: {daftar}. Happy fasting! 🌙",
+    ),
+    (
+        "notif_puasa_besok_title",
+        "Persiapan puasa sunnah",
+        "Sunnah fast preparation",
+    ),
+    (
+        "notif_puasa_besok_body",
+        "Besok {daftar}. Siapkan sahur & niat puasa! 🌙",
+        "Tomorrow: {daftar}. Get your suhoor & intention ready! 🌙",
+    ),
+    // Settings — Al-Qur'an
+    ("sec_quran", "Al-Qur'an", "Qur'an"),
+    (
+        "f_quran_terjemahan",
+        "Tampilkan terjemahan",
+        "Show translation",
+    ),
+    (
+        "hint_quran_terjemahan",
+        "terjemahan Kemenag di bawah ayat",
+        "Kemenag translation under each verse",
+    ),
+    ("f_quran_tampilan", "Gaya baca", "Reading layout"),
+    ("quran_mode_ayat", "Per ayat", "Per verse"),
+    ("quran_mode_mushaf", "Mushaf", "Mushaf"),
+    ("f_quran_waqf", "Tanda waqf", "Pause marks"),
+    (
+        "hint_quran_waqf",
+        "penanda berhenti baca (ۙ ۚ ۛ)",
+        "stop marks (ۙ ۚ ۛ)",
+    ),
+    ("quran_waqf_tampil", "Tampil", "Shown"),
+    ("quran_waqf_redup", "Redup", "Dimmed"),
+    ("quran_waqf_sembunyi", "Sembunyi", "Hidden"),
+    (
+        "hint_terjemahan_mushaf",
+        "nonaktif saat mode Mushaf",
+        "unavailable in Mushaf mode",
     ),
 ];
 

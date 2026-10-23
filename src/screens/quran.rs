@@ -1,11 +1,15 @@
-//! Layar Al-Qur'an — daftar 114 surah + pembaca (teks Arab mushaf Kemenag
-//! + terjemahan resmi Kemenag RI, 100% offline dari `crate::quran`) ala
-//! frame "Quran" design system pen:
+//! Layar Al-Qur'an — daftar 114 surah + pembaca, teks Arab mushaf Kemenag
+//! dan terjemahan resmi Kemenag RI (100% offline dari `crate::quran`),
+//! ala frame "Quran" design system pen.
+//!
 //! - mode daftar: kotak cari + papan baris surah (nomor, nama latin, meta
 //!   jumlah ayat, badge Makkiyah/Madaniyah, nama Arab rata kanan);
 //! - mode baca (master–detail): sidebar surah di kiri + kartu baca di
-//!   kanan — kepala surah, navigasi prev/next, basmalah, lalu blok ayat
-//!   (teks Arab RTL + ornamen nomor ayat, terjemahan di bawahnya).
+//!   kanan — kepala surah, basmalah, lalu ayat dengan gaya baca dari
+//!   settings: "per ayat" (blok terpisah, terjemahan di bawah tiap ayat)
+//!   atau "mushaf" (aliran Arab menerus, selalu tanpa terjemahan, jarak
+//!   baris longgar). Tanda waqf dipisah dari teks (lihat
+//!   `quran::segmen_teks`) sehingga bisa diredek/disembunyikan.
 
 use crate::components::ui::icons;
 use crate::i18n::tr;
@@ -136,11 +140,37 @@ fn BarisSurah(nomor: u8, aktif: bool, on_pilih: EventHandler<u8>) -> Element {
     }
 }
 
-/// Kartu baca: kepala surah dan blok ayat (teks Arab RTL + penanda nomor
-/// setelah teks, terjemahan Indonesia). Pindah surah lewat sidebar.
+/// Kartu baca: kepala surah dan blok ayat. Gaya baca dari settings:
+/// - per ayat (default): tiap ayat satu blok — Arab RTL + ornamen nomor,
+///   terjemahan di bawahnya;
+/// - mushaf: seluruh ayat mengalir menerus (aliran RTL) dengan jarak
+///   baris longgar, selalu tanpa terjemahan; ornamen nomor menyatu di
+///   aliran.
+/// Pindah surah lewat sidebar.
 #[component]
 fn KartuBaca(nomor: u8) -> Element {
-    let lang = state::settings().language;
+    let settings = state::settings();
+    let lang = settings.language;
+    let mushaf = settings.quran_mushaf;
+    // Mode mushaf selalu Arab murni — setting terjemahan hanya berlaku di
+    // mode per ayat (switch di Pengaturan ikut dinonaktifkan saat mushaf).
+    let tampil_terjemahan = settings.quran_terjemahan && !mushaf;
+    // Tanda waqf dirender sebagai inline-block ber-font-size sendiri — ini
+    // memutus shaping run, jadi glyph tidak lagi "menggantung" di atas
+    // huruf terakhir (perilaku mark-attachment Amiri yang bikin posisinya
+    // beda-beda: nempel huruf = tinggi sekali, ada spasi = netral).
+    // Semua jenis tanda jadi seragam: 16px, sejajar tengah, turun sedikit.
+    // Jarak horizontalnya dihitung di TeksAyat (tergantung ada tidaknya
+    // spasi di teks). None = disembunyikan sesuai setting.
+    let kelas_waqf = match settings.quran_waqf {
+        crate::settings::QuranWaqf::Tampil => {
+            Some("inline-block text-[16px] align-middle relative top-[2px]")
+        }
+        crate::settings::QuranWaqf::Redup => {
+            Some("inline-block text-[16px] align-middle relative top-[2px] text-ink-3")
+        }
+        crate::settings::QuranWaqf::Sembunyi => None,
+    };
     let Some(s) = quran::baca(nomor) else {
         return rsx! {};
     };
@@ -181,28 +211,85 @@ fn KartuBaca(nomor: u8) -> Element {
                         }
                     }
                 }
-                for (i, (arab, terjemahan)) in s.ayat.iter().enumerate() {
-                    {
-                        let nomor_arab = crate::screens::calendar::arabic_numerals((i + 1) as u32);
-                        rsx! {
-                            div { class: "px-5 py-4 border-b border-hairline last:border-b-0",
-                                // Penanda nomor mengalir langsung setelah kata
-                                // terakhir (gaya mushaf) — lingkaran ornamen
-                                // dengan jarak kecil dari teks (ms = sisi
-                                // kanan di RTL).
-                                p { class: "font-arab text-[23px] leading-[2] text-ink text-right",
-                                    dir: "rtl",
-                                    "{arab}"
-                                    span { class: "ms-2 inline-flex w-8 h-8 shrink-0 items-center justify-center rounded-full border border-amber/50 bg-amber/10 align-middle font-arab text-[13px] text-amber",
-                                        "{nomor_arab}"
+                if mushaf {
+                    // Gaya mushaf: satu paragraf aliran Arab menerus, jarak
+                    // baris longgar biar nyaman dibaca; tanpa terjemahan.
+                    div { class: "px-6 py-6",
+                        p { class: "font-arab text-[23px] leading-[2.75] text-ink text-right",
+                            dir: "rtl",
+                            for (i, (arab, _arti)) in s.ayat.iter().enumerate() {
+                                {
+                                    let nomor_arab =
+                                        crate::screens::calendar::arabic_numerals((i + 1) as u32);
+                                    rsx! {
+                                        TeksAyat { teks: arab, kelas_waqf: kelas_waqf }
+                                        // Ornamen nomor menyatu di aliran —
+                                        // jarak dua sisi agar ayat berikutnya
+                                        // tak menempel.
+                                        span { class: "mx-2 inline-flex w-8 h-8 shrink-0 items-center justify-center rounded-full border border-amber/50 bg-amber/10 align-middle font-arab text-[13px] text-amber",
+                                            "{nomor_arab}"
+                                        }
                                     }
-                                }
-                                p { class: "mt-2 text-[13px] leading-relaxed text-ink-2",
-                                    "{terjemahan}"
                                 }
                             }
                         }
                     }
+                } else {
+                    for (i, (arab, terjemahan)) in s.ayat.iter().enumerate() {
+                        {
+                            let nomor_arab = crate::screens::calendar::arabic_numerals((i + 1) as u32);
+                            rsx! {
+                                div { class: "px-5 py-4 border-b border-hairline last:border-b-0",
+                                    // Penanda nomor mengalir langsung setelah kata
+                                    // terakhir (gaya mushaf) — lingkaran ornamen
+                                    // dengan jarak kecil dari teks (ms = sisi
+                                    // kanan di RTL).
+                                    p { class: "font-arab text-[23px] leading-[2] text-ink text-right",
+                                        dir: "rtl",
+                                        TeksAyat { teks: arab, kelas_waqf: kelas_waqf }
+                                        span { class: "ms-2 inline-flex w-8 h-8 shrink-0 items-center justify-center rounded-full border border-amber/50 bg-amber/10 align-middle font-arab text-[13px] text-amber",
+                                            "{nomor_arab}"
+                                        }
+                                    }
+                                    if tampil_terjemahan {
+                                        p { class: "mt-2 text-[13px] leading-relaxed text-ink-2",
+                                            "{terjemahan}"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// Teks Arab satu ayat dengan tanda waqf yang sudah dipisah (`quran::
+/// segmen_teks`): tanda bisa distyle (diturunkan + jarak, atau redup)
+/// atau disembunyikan sesuai settings. Jarak di depan tanda kondisional:
+/// tintanya menjorok balik ke arah kata sebelumnya, sehingga tanda yang
+/// menempel langsung di huruf (tanpa spasi di teks, mis. akhir ayat 2)
+/// butuh margin lebih besar agar setara dengan tanda ber-spasi.
+#[component]
+fn TeksAyat(teks: &'static str, kelas_waqf: Option<&'static str>) -> Element {
+    let segmen = quran::segmen_teks(teks);
+    rsx! {
+        for (i, (potongan, tanda)) in segmen.iter().enumerate() {
+            {
+                if *tanda {
+                    match kelas_waqf {
+                        Some(dasar) => {
+                            let nempel = i > 0
+                                && !segmen[i - 1].0.ends_with(char::is_whitespace);
+                            let jarak = if nempel { "ms-[10px]" } else { "ms-[4px]" };
+                            rsx! { span { class: "{dasar} {jarak}", "{potongan}" } }
+                        }
+                        None => rsx! {},
+                    }
+                } else {
+                    rsx! { span { "{potongan}" } }
                 }
             }
         }

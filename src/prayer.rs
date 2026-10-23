@@ -252,6 +252,20 @@ pub fn format_time(t: NaiveTime, h24: bool) -> String {
     }
 }
 
+/// Tanggal masehi "efektif" untuk konteks HIJRIAH: hari hijriah D berjalan
+/// dari Maghrib D−1 sampai Maghrib D, jadi begitu lewat Maghrib hari ini
+/// tanggal hijriah sudah milik besok. Dipakai untuk TAMPILAN — label
+/// tanggal hijriah, badge Ramadan, pil puasa sunnah, kartu Tanggal
+/// Penting — bukan untuk trigger adzan/imsak yang tetap berbasis tanggal
+/// masehi (puasa Senin tetap puasa siang Senin masehi).
+pub fn tanggal_efektif_hijriah(times: &DayTimes, now: NaiveTime, today: NaiveDate) -> NaiveDate {
+    if now >= times.maghrib {
+        today.succ_opt().unwrap_or(today)
+    } else {
+        today
+    }
+}
+
 /// Waktu "sekarang" dalam zona waktu kota.
 ///
 /// Untuk testing, dua env var (bisa dipakai sendiri-sendiri atau digabung):
@@ -340,6 +354,25 @@ mod tests {
         assert_eq!(format_time(sore, false), "04:05 PM");
         let dini_hari = NaiveTime::from_hms_opt(0, 11, 0).unwrap();
         assert_eq!(format_time(dini_hari, false), "12:11 AM");
+    }
+
+    #[test]
+    fn tanggal_efektif_hijriah_berganti_di_maghrib() {
+        let s = jakarta();
+        let date = NaiveDate::from_ymd_opt(2026, 10, 23).unwrap(); // Jumat
+        let besok = NaiveDate::from_ymd_opt(2026, 10, 24).unwrap();
+        let t = day_times(&s, date).expect("perhitungan berhasil");
+
+        let hm = |h: u32, m: u32| NaiveTime::from_hms_opt(h, m, 0).unwrap();
+        // Sebelum Maghrib — termasuk dini hari — masih tanggal hari ini.
+        assert_eq!(tanggal_efektif_hijriah(&t, hm(1, 0), date), date);
+        assert_eq!(
+            tanggal_efektif_hijriah(&t, t.maghrib - chrono::Duration::minutes(1), date),
+            date
+        );
+        // Tepat & setelah Maghrib — hari hijriah sudah milik besok.
+        assert_eq!(tanggal_efektif_hijriah(&t, t.maghrib, date), besok);
+        assert_eq!(tanggal_efektif_hijriah(&t, hm(23, 30), date), besok);
     }
 
     // Referensi kalibrasi: Aladhan API method=20 (Kemenag) untuk Jakarta
